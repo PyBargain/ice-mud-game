@@ -2,7 +2,7 @@
 # coding=utf-8
 
 
-import time
+import math, time
 
 import pygame
 from pygame.locals import *
@@ -45,10 +45,10 @@ class Display:
         pygame.init()
         clock = pygame.time.Clock()
         surf = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
-        font = pygame.font.Font(pygame.font.get_default_font(), 18)
-        mapImage = pygame.image.load('map.png')
+        font = pygame.font.Font('C:\\WINDOWS\\Fonts\\STSONG.TTF', 18)
+        mapImage = pygame.image.load('map.png').convert(32, SRCALPHA)
         mapRect = mapImage.get_rect()
-        carImage = pygame.image.load('car.png')
+        carImage = pygame.image.load('car.png').convert(32, SRCALPHA)
         pygame.display.set_caption('Ice Mud Game')
         while self.running:
             t = time.time() - self.startTime
@@ -67,12 +67,12 @@ class Display:
             cx = x + dt * dx
             cy = y + dt * dy
             # draw map
-            mapRect.topleft = (WINMIDX - x, WINMIDY - y)
+            mapRect.topleft = (WINMIDX - cx, WINMIDY - cy)
             surf.blit(mapImage, mapRect)
             # draw buildings
             pass
             # draw cars
-            for name, t0, x, dx, y, dy, drct in data:
+            for name, t0, x, dx, y, dy, drct in reversed(data):
                 x += dt * dx - cx
                 y += dt * dy - cy
                 rotatedCar = pygame.transform.rotate(carImage, drct)
@@ -82,7 +82,8 @@ class Display:
                 nameSurf = font.render(name, True, NAMECOLOR)
                 nameRect = nameSurf.get_rect()
                 nameRect.center = (WINMIDX + x, WINMIDY + y - 40)
-                surf.fill(NAMEBG, nameRect)
+                # FIXME: 这里还有点问题，先去掉
+                # surf.fill(NAMEBG, nameRect)
                 surf.blit(nameSurf, nameRect)
             pygame.display.update()
             clock.tick(FPS)
@@ -98,9 +99,36 @@ class Display:
 def nop():
     pass
 
+l = [['P1', 0, 500, 10, 250, 20, 100], ['玩家2', 0, 500, 5, 250, 7, 0]]
+
 def gd():
-    return [('P1', 0, 500, 0, 250, 0, 100), ('玩家2', 0, 500, 2, 250, 1, 0)]
+    return l
 
+def update():
+    t = time.time() - display.startTime
+    for i in l:
+        dt = t - i[1]
+        i[2] += i[3] * dt
+        i[4] += i[5] * dt
+        i[1] = t
 
-display = Display(time.time() + 4, gd, nop, nop, nop, nop, nop, nop, nop, nop)
+def up():
+    update()
+    l[0][3] -= 2 * math.sin(math.radians(l[0][6]))
+    l[0][5] -= 2 * math.cos(math.radians(l[0][6]))
+
+def down():
+    update()
+    l[0][3] += 2 * math.sin(math.radians(l[0][6]))
+    l[0][5] += 2 * math.cos(math.radians(l[0][6]))
+
+def left():
+    update()
+    l[0][6] += 20
+
+def right():
+    update()
+    l[0][6] -= 20
+
+display = Display(time.time() + 4, gd, up, nop, down, nop, left, nop, right, nop)
 display.show()
