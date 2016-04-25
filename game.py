@@ -46,7 +46,7 @@ class Display:
         clock = pygame.time.Clock()
         surf = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
         # 路径'C:\\WINDOWS\\Fonts\\STSONG.TTF'已弃用
-        font = pygame.font.Font('wqy-microhei.ttc', 18)
+        font = pygame.font.Font('font/wqy-microhei.ttc', 18)
         mapImage = pygame.image.load('map.png').convert(32, SRCALPHA)
         mapRect = mapImage.get_rect()
         carImage = pygame.image.load('car.png').convert(32, SRCALPHA)
