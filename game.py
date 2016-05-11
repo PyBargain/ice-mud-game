@@ -42,14 +42,21 @@ class Display:
 
         此函数直到stop被调用后才会返回
         '''
+        global update, l
         pygame.init()
         clock = pygame.time.Clock()
         surf = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
         # 路径'C:\\WINDOWS\\Fonts\\STSONG.TTF'已弃用
         font = pygame.font.Font('font/wqy-microhei.ttc', 18)
         mapImage = pygame.image.load('map.png').convert(32, SRCALPHA)
+        mapImage = pygame.transform.scale(mapImage, (mapImage.get_width()*4, mapImage.get_height()*4))
         mapRect = mapImage.get_rect()
+        mapMask = pygame.image.load('mapmask.png').convert(32, SRCALPHA)
+        mapMask = pygame.transform.scale(mapMask, (mapMask.get_width()*4, mapMask.get_height()*4))
         carImage = pygame.image.load('car.png').convert(32, SRCALPHA)
+        carImage.set_colorkey(carImage.get_at((0,0)))
+        carImage = carImage.convert(32, SRCALPHA)
+        carImage = pygame.transform.scale(carImage, (carImage.get_width()//16, carImage.get_height()//16))
         pygame.display.set_caption('Ice Mud Game')
         while self.running:
             t = time.time() - self.startTime
@@ -76,6 +83,10 @@ class Display:
             for name, t0, x, dx, y, dy, drct in reversed(data):
                 x += dt * dx - cx
                 y += dt * dy - cy
+                if name == 'P1' and sum(mapMask.get_at((int(x+cx), int(y+cy)))) > 260:
+                    update()
+                    l[0][3] = 0
+                    l[0][5] = 0
                 rotatedCar = pygame.transform.rotate(carImage, drct)
                 carRect = rotatedCar.get_rect()
                 carRect.center = (WINMIDX + x, WINMIDY + y)
@@ -100,7 +111,8 @@ class Display:
 def nop():
     pass
 
-l = [['P1', 0, 500, 10, 250, 20, 100], ['玩家2', 0, 500, 5, 250, 7, 0]]
+#           t    x vx    y vy    d
+l = [['P1', 0, 1000, 0, 450, 0, 100], ['玩家2', 0, 500, 5, 250, 7, 0]]
 
 def gd():
     return l
@@ -115,21 +127,29 @@ def update():
 
 def up():
     update()
-    l[0][3] -= 2 * math.sin(math.radians(l[0][6]))
-    l[0][5] -= 2 * math.cos(math.radians(l[0][6]))
+    l[0][2] -= 1 * math.sin(math.radians(l[0][6]))
+    l[0][4] -= 1 * math.cos(math.radians(l[0][6]))
+    l[0][3] -= 10 * math.sin(math.radians(l[0][6]))
+    l[0][5] -= 10 * math.cos(math.radians(l[0][6]))
 
 def down():
     update()
-    l[0][3] += 2 * math.sin(math.radians(l[0][6]))
-    l[0][5] += 2 * math.cos(math.radians(l[0][6]))
+    l[0][2] += 1 * math.sin(math.radians(l[0][6]))
+    l[0][4] += 1 * math.cos(math.radians(l[0][6]))
+    l[0][3] += 10 * math.sin(math.radians(l[0][6]))
+    l[0][5] += 10 * math.cos(math.radians(l[0][6]))
 
 def left():
     update()
-    l[0][6] += 20
+    l[0][3] *= 0.8
+    l[0][5] *= 0.8
+    l[0][6] += 10
 
 def right():
     update()
-    l[0][6] -= 20
+    l[0][3] *= 0.8
+    l[0][5] *= 0.8
+    l[0][6] -= 10
 
 display = Display(time.time() + 4, gd, up, nop, down, nop, left, nop, right, nop)
 display.show()
