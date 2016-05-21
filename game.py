@@ -3,6 +3,7 @@
 
 
 import math, time
+import random
 
 import pygame
 from pygame.locals import *
@@ -33,7 +34,8 @@ class Building:
         '''
         self.rect = rect
         self.height = height
-        self.side, self.top = BUILDINGIMG[image]
+        # TODO: SMG->_->, by ustc-zzzz
+        # self.side, self.top = BUILDINGIMG[image]
         self.scale = CAMERAH / (CAMERAH - height)
         self._screenr = pygame.rect.Rect(rect)
         self._screenr.w *= self.scale
@@ -114,13 +116,54 @@ class Building:
                         Rect((i-left)*self.side.height//width, 0, (self.side.height+width-1)//width, self.side.width))
         elif x < rect.left:
             # 画右侧面
+            pass
         if y > rect.bottom:
             # 画上侧面
+            pass
         elif y < rect.top:
             # 画下侧面
+            pass
         # 画顶面
         display.blit(self.top, toprect)
 
+class PlayerData:
+    '''
+    玩家数据
+    '''
+
+    def __init__(self, name):
+        # name
+        self.name = name
+
+        # second
+        self.time = 0
+
+        # position
+        self.pos_x = 0
+        self.pos_y = 0
+
+        # speed
+        self.motion_x = 0
+        self.motion_y = 0
+
+        # sqrt(self.motion_x ** 2 + self.motion_y ** 2)
+        self.speed = 1
+
+        # rotation in rad
+        self.rotation = 0
+
+    def update_tick(self, time):
+        dt = self.time - time
+        self.time = time
+        self.motion_x = self.speed * math.sin(self.rotation)
+        self.motion_y = self.speed * math.cos(self.rotation)
+        self.pos_x += dt * self.motion_x
+        self.pos_y += dt * self.motion_y
+        self.speed = math.sqrt(self.motion_x ** 2 + self.motion_y ** 2)
+        if self.speed != 0:
+            self.rotation = math.acos(self.motion_y / self.speed) \
+                if self.motion_x > 0 \
+                else - math.acos(self.motion_y / self.speed)
 
 class Display:
 
@@ -139,7 +182,86 @@ class Display:
         self.getData = getData
         self.onKeyDown = {K_UP: upDown, K_DOWN: downDown, K_LEFT: leftDown, K_RIGHT: rightDown}
         self.onKeyUp = {K_UP: upUp, K_DOWN: downUp, K_LEFT: leftUp, K_RIGHT: rightUp}
+        self.surf = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
+        self.last_tick = time.time() - self.startTime
         self.running = True
+
+    def handle_key(self):
+        '''
+        响应键盘事件
+        '''
+        for event in pygame.event.get():
+            if event.type == KEYUP:
+                if event.key in self.onKeyUp:
+                    self.onKeyUp[event.key]()
+                if event.key == K_ESCAPE:
+                    self.stop()
+            if event.type == KEYDOWN:
+                if event.key in self.onKeyDown:
+                    self.onKeyDown[event.key]()
+
+    def draw_map(self):
+        '''
+        背景图
+        '''
+        mapImage = pygame.image.load('map.png').convert(32, SRCALPHA)
+        mapRect = mapImage.get_rect()
+        mapRect.topleft = (0, 0)
+        self.surf.blit(mapImage, mapRect)
+
+    def draw_car(self, player_data):
+        '''
+        快上车
+        '''
+        carImage = pygame.image.load('car.png').convert(32, SRCALPHA)
+        rotatedCar = pygame.transform.rotate(carImage, player_data.rotation * 180 / math.pi)
+        carRect = rotatedCar.get_rect()
+        carRect.center = (WINMIDX + player_data.pos_x, WINMIDY + player_data.pos_y)
+        self.surf.blit(rotatedCar, carRect)
+        font = pygame.font.Font('font/wqy-microhei.ttc', 18)
+        nameSurf = font.render(player_data.name, True, NAMECOLOR)
+        nameRect = nameSurf.get_rect()
+        nameRect.center = (WINMIDX + player_data.pos_x, WINMIDY + player_data.pos_y - 40)
+        # FIXME: 这里还有点问题，先去掉
+        # surf.fill(NAMEBG, nameRect)
+        self.surf.blit(nameSurf, nameRect)
+
+    def draw_building(self):
+        '''
+        建筑物
+        '''
+        # TODO: Your work, FasdSnake
+        pass
+
+    def draw_cars(self):
+        '''
+        所有的车
+        '''
+        for player_data in self.getData():
+            self.draw_car(player_data)
+
+    def tick_player(self, t):
+        '''
+        玩家逻辑
+        '''
+        for player_data in self.getData():
+            player_data.update_tick(t)
+
+    def tick(self, t):
+        '''
+        Game loop
+        '''
+        # key events
+        self.handle_key()
+        # tick player
+        self.tick_player(t)
+        # draw
+        self.draw_map()
+        self.draw_building()
+        self.draw_cars()
+        # update
+        pygame.display.update()
+        self.last_tick = t
 
     def show(self):
         '''
@@ -149,48 +271,9 @@ class Display:
         '''
         pygame.init()
         clock = pygame.time.Clock()
-        surf = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
-        font = pygame.font.Font('font/wqy-microhei.ttc', 18)
-        mapImage = pygame.image.load('map.png').convert(32, SRCALPHA)
-        mapRect = mapImage.get_rect()
-        carImage = pygame.image.load('car.png').convert(32, SRCALPHA)
         pygame.display.set_caption('Ice Mud Game')
         while self.running:
-            t = time.time() - self.startTime
-            for event in pygame.event.get():
-                if event.type == KEYUP:
-                    if event.key in self.onKeyUp:
-                        self.onKeyUp[event.key]()
-                    if event.key == K_ESCAPE:
-                        self.stop()
-                if event.type == KEYDOWN:
-                    if event.key in self.onKeyDown:
-                        self.onKeyDown[event.key]()
-            data = self.getData()
-            name, t0, x, dx, y, dy, drct = data[0]
-            dt = t - t0
-            cx = x + dt * dx
-            cy = y + dt * dy
-            # draw map
-            mapRect.topleft = (WINMIDX - cx, WINMIDY - cy)
-            surf.blit(mapImage, mapRect)
-            # draw buildings
-            pass  # TODO
-            # draw cars
-            for name, t0, x, dx, y, dy, drct in reversed(data):
-                x += dt * dx - cx
-                y += dt * dy - cy
-                rotatedCar = pygame.transform.rotate(carImage, drct)
-                carRect = rotatedCar.get_rect()
-                carRect.center = (WINMIDX + x, WINMIDY + y)
-                surf.blit(rotatedCar, carRect)
-                nameSurf = font.render(name, True, NAMECOLOR)
-                nameRect = nameSurf.get_rect()
-                nameRect.center = (WINMIDX + x, WINMIDY + y - 40)
-                # FIXME: 这里还有点问题，先去掉
-                # surf.fill(NAMEBG, nameRect)
-                surf.blit(nameSurf, nameRect)
-            pygame.display.update()
+            self.tick(time.time() - self.startTime)
             clock.tick(FPS)
         pygame.quit()
 
@@ -204,36 +287,29 @@ class Display:
 def nop():
     pass
 
-l = [['P1', 0, 500, 10, 250, 20, 100], ['玩家2', 0, 500, 5, 250, 7, 0]]
+player_data = [PlayerData("Player1"), PlayerData('玩家2')]
 
-def gd():
-    return l
+def get_data():
+    return player_data
 
 def update():
     t = time.time() - display.startTime
-    for i in l:
-        dt = t - i[1]
-        i[2] += i[3] * dt
-        i[4] += i[5] * dt
-        i[1] = t
+    for player in player_data:
+        player.update_tick(t - player.time)
 
 def up():
-    update()
-    l[0][3] -= 2 * math.sin(math.radians(l[0][6]))
-    l[0][5] -= 2 * math.cos(math.radians(l[0][6]))
+    for player in player_data:
+        player.speed += 50 + 5 * random.random()
 
 def down():
-    update()
-    l[0][3] += 2 * math.sin(math.radians(l[0][6]))
-    l[0][5] += 2 * math.cos(math.radians(l[0][6]))
+    for player in player_data:
+        player.speed -= 50 + 5 * random.random()
 
 def left():
-    update()
-    l[0][6] += 20
+    player_data[0].rotation += 0.1
 
 def right():
-    update()
-    l[0][6] -= 20
+    player_data[0].rotation -= 0.1
 
-display = Display(time.time() + 4, gd, up, nop, down, nop, left, nop, right, nop)
+display = Display(time.time() - 4, get_data, up, nop, down, nop, left, nop, right, nop)
 display.show()
