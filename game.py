@@ -8,7 +8,6 @@ import random
 import pygame
 from pygame.locals import *
 
-
 WINDOWWIDTH = 640
 WINDOWHEIGHT = 480
 WINMIDX = WINDOWWIDTH / 2
@@ -20,7 +19,6 @@ CAMERAH = 10
 
 
 class Building:
-
     def __init__(self, rect, height, image):
         '''
         产生一个建筑物对象
@@ -61,8 +59,10 @@ class Building:
         right = self.rect.right
         top = self.rect.top
         bottom = self.rect.bottom
+
         def calcdw(x, y):
-            return (x/y if y > x else 2 - y/x, x*x + y*y)
+            return (x / y if y > x else 2 - y / x, x * x + y * y)
+
         if x > left:
             if y > bottom:
                 # l为左下角
@@ -109,11 +109,12 @@ class Building:
             rbottom = toprect.bottom
             width = right - left
             for i in range(left, right):
-                top = (i-left)*(rtop-ltop)//width+ltop
-                bottom = (i-left)*(rbottom-lbottom)//width+lbottom
+                top = (i - left) * (rtop - ltop) // width + ltop
+                bottom = (i - left) * (rbottom - lbottom) // width + lbottom
                 display.blit(pygame.transform.rotate(self.side, 90),
-                        Rect(i, top, 1, bottom - top),
-                        Rect((i-left)*self.side.height//width, 0, (self.side.height+width-1)//width, self.side.width))
+                             Rect(i, top, 1, bottom - top),
+                             Rect((i - left) * self.side.height // width, 0, (self.side.height + width - 1) // width,
+                                  self.side.width))
         elif x < rect.left:
             # 画右侧面
             pass
@@ -125,6 +126,7 @@ class Building:
             pass
         # 画顶面
         display.blit(self.top, toprect)
+
 
 class PlayerData:
     '''
@@ -139,8 +141,8 @@ class PlayerData:
         self.time = 0
 
         # position
-        self.pos_x = 0
-        self.pos_y = 0
+        self.pos_x = 100
+        self.pos_y = 100
 
         # speed
         self.motion_x = 0
@@ -165,10 +167,10 @@ class PlayerData:
                 if self.motion_x > 0 \
                 else - math.acos(self.motion_y / self.speed)
 
-class Display:
 
+class Display:
     def __init__(self, startTime, getData, upDown, upUp, downDown, downUp,
-            leftDown, leftUp, rightDown, rightUp):
+                 leftDown, leftUp, rightDown, rightUp):
         '''
         产生一个display对象
 
@@ -186,6 +188,9 @@ class Display:
         self.last_tick = time.time() - self.startTime
         self.running = True
 
+        self.map_width = 0
+        self.map_height = 0
+
     def handle_key(self):
         '''
         响应键盘事件
@@ -200,13 +205,19 @@ class Display:
                 if event.key in self.onKeyDown:
                     self.onKeyDown[event.key]()
 
-    def draw_map(self):
+    def calculate_offset(self, pos_x, pos_y):
+        x = min(max(WINMIDX - current_player_data.pos_x, WINDOWWIDTH - self.map_width), 0) + pos_x
+        y = min(max(WINMIDY - current_player_data.pos_y, WINDOWHEIGHT - self.map_height), 0) + pos_y
+        return (x, y)
+
+    def draw_map(self, player_data):
         '''
         背景图
         '''
         mapImage = pygame.image.load('map.png').convert(32, SRCALPHA)
         mapRect = mapImage.get_rect()
-        mapRect.topleft = (0, 0)
+        self.map_width, self.map_height = mapRect[2], mapRect[3]
+        mapRect.topleft = self.calculate_offset(0, 0)
         self.surf.blit(mapImage, mapRect)
 
     def draw_car(self, player_data):
@@ -216,17 +227,17 @@ class Display:
         carImage = pygame.image.load('car.png').convert(32, SRCALPHA)
         rotatedCar = pygame.transform.rotate(carImage, player_data.rotation * 180 / math.pi)
         carRect = rotatedCar.get_rect()
-        carRect.center = (WINMIDX + player_data.pos_x, WINMIDY + player_data.pos_y)
+        carRect.center = self.calculate_offset(player_data.pos_x, player_data.pos_y)
         self.surf.blit(rotatedCar, carRect)
         font = pygame.font.Font('font/wqy-microhei.ttc', 18)
         nameSurf = font.render(player_data.name, True, NAMECOLOR)
         nameRect = nameSurf.get_rect()
-        nameRect.center = (WINMIDX + player_data.pos_x, WINMIDY + player_data.pos_y - 40)
+        nameRect.center = self.calculate_offset(player_data.pos_x, player_data.pos_y - 48)
         # FIXME: 这里还有点问题，先去掉
         # surf.fill(NAMEBG, nameRect)
         self.surf.blit(nameSurf, nameRect)
 
-    def draw_building(self):
+    def draw_building(self, player_data):
         '''
         建筑物
         '''
@@ -256,8 +267,8 @@ class Display:
         # tick player
         self.tick_player(t)
         # draw
-        self.draw_map()
-        self.draw_building()
+        self.draw_map(current_player_data)
+        self.draw_building(current_player_data)
         self.draw_cars()
         # update
         pygame.display.update()
@@ -287,29 +298,32 @@ class Display:
 def nop():
     pass
 
+
 player_data = [PlayerData("Player1"), PlayerData('玩家2')]
+
+current_player_data = player_data[0]
+
 
 def get_data():
     return player_data
 
-def update():
-    t = time.time() - display.startTime
-    for player in player_data:
-        player.update_tick(t - player.time)
 
 def up():
-    for player in player_data:
-        player.speed += 50 + 5 * random.random()
+    current_player_data.speed += 50 + 5 * random.random()
+
 
 def down():
-    for player in player_data:
-        player.speed -= 50 + 5 * random.random()
+    current_player_data.speed -= 50 + 5 * random.random()
+
 
 def left():
-    player_data[0].rotation += 0.1
+    current_player_data.rotation += 0.1
+
 
 def right():
-    player_data[0].rotation -= 0.1
+    current_player_data.rotation -= 0.1
 
-display = Display(time.time() - 4, get_data, up, nop, down, nop, left, nop, right, nop)
-display.show()
+
+if __name__ == "__main__":
+    display = Display(time.time() - 4, get_data, up, nop, down, nop, left, nop, right, nop)
+    display.show()
