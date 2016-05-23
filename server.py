@@ -47,7 +47,7 @@ class GameServer():
     '''
     Three Steps:
 
-            Client: send_message
+            Client: send_packet
     Client ------------------------> Server
 
             Server: handle_message
@@ -67,8 +67,10 @@ class GameServer():
 
     def run(self):
         self.socket = socketserver.ThreadingTCPServer((self.host, self.port), self.create_handler)
-        threading.Thread(target=self.socket.serve_forever).start()
-        time.sleep(10)
+        network_thread = threading.Thread(target=self.socket.serve_forever)
+        network_thread.start()
+        self.map.run()
+        print("Stop server... ")
         self.stop()
 
     def stop(self):
@@ -83,7 +85,7 @@ class GameServer():
 
         def handle(self):
             message_pool = ""
-            while 1:
+            while self.game_server.map.running:
                 message = str(self.request.recv(128), "utf-8")
 
                 if not message: break
@@ -97,10 +99,11 @@ class GameServer():
                 print("(Client)", repr(self.client_address), message)
                 packet_handler = self.packet_types[message[0]]()
                 new_message = packet_handler.handle_message(message[2::], self.client_address, self.game_server)
-                if (new_message is None): break
+                if (new_message is None):
+                    break
                 else:
                     print("(Server)", repr(self.server.server_address), message[0] + message[1] + new_message)
-                    self.request.sendall(bytes(message[0] + message[1] + new_message, "utf-8"))
+                    self.request.sendall(bytes(message[0] + message[1] + new_message + '\n', "utf-8"))
 
 
 class PlayerDataServer(game.PlayerData):
@@ -149,13 +152,10 @@ class RaceMap():
     def run(self):
         '''
         循环显示游戏界面
-
-        此函数直到stop被调用后才会返回
         '''
         while self.running:
-            self.tick(time.time() - self.startTime)
-            time.sleep(game.FPS - time.time() % game.FPS)
-        self.game_server.stop()
+            self.tick(time.time() - self.start_time)
+            time.sleep((1.0 / game.FPS) - time.time() % (1.0 / game.FPS))
 
     def tick(self, t):
         '''
@@ -170,4 +170,5 @@ class RaceMap():
         self.last_tick = t
 
 
-GameServer().run()
+if __name__ == "__main__":
+    GameServer().run()

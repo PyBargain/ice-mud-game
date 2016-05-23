@@ -2,7 +2,7 @@
 # coding=utf-8
 
 
-import math, time
+import math, time, base64, struct
 import random
 
 import pygame
@@ -141,8 +141,8 @@ class PlayerData:
         self.time = 0
 
         # position
-        self.pos_x = 100
-        self.pos_y = 100
+        self.pos_x = 200
+        self.pos_y = 200
 
         # speed
         self.motion_x = 0
@@ -169,8 +169,8 @@ class PlayerData:
 
 
 class Display:
-    def __init__(self, startTime, getData, upDown, upUp, downDown, downUp,
-                 leftDown, leftUp, rightDown, rightUp):
+    def __init__(self, startTime, getData, thePlayerData, upDown, upUp, downDown, downUp,
+                 leftDown, leftUp, rightDown, rightUp, game_server):
         '''
         产生一个display对象
 
@@ -182,9 +182,11 @@ class Display:
         '''
         self.startTime = startTime
         self.getData = getData
+        self.thePlayerData = thePlayerData
         self.onKeyDown = {K_UP: upDown, K_DOWN: downDown, K_LEFT: leftDown, K_RIGHT: rightDown}
         self.onKeyUp = {K_UP: upUp, K_DOWN: downUp, K_LEFT: leftUp, K_RIGHT: rightUp}
         self.surf = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
+        self.game_server = game_server
         self.last_tick = time.time() - self.startTime
         self.running = True
 
@@ -206,8 +208,8 @@ class Display:
                     self.onKeyDown[event.key]()
 
     def calculate_offset(self, pos_x, pos_y):
-        x = min(max(WINMIDX - current_player_data.pos_x, WINDOWWIDTH - self.map_width), 0) + pos_x
-        y = min(max(WINMIDY - current_player_data.pos_y, WINDOWHEIGHT - self.map_height), 0) + pos_y
+        x = min(max(WINMIDX - self.thePlayerData.pos_x, WINDOWWIDTH - self.map_width), 0) + pos_x
+        y = min(max(WINMIDY - self.thePlayerData.pos_y, WINDOWHEIGHT - self.map_height), 0) + pos_y
         return (x, y)
 
     def draw_map(self, player_data):
@@ -267,8 +269,8 @@ class Display:
         # tick player
         self.tick_player(t)
         # draw
-        self.draw_map(current_player_data)
-        self.draw_building(current_player_data)
+        self.draw_map(self.thePlayerData)
+        self.draw_building(self.thePlayerData)
         self.draw_cars()
         # update
         pygame.display.update()
@@ -283,6 +285,7 @@ class Display:
         pygame.init()
         clock = pygame.time.Clock()
         pygame.display.set_caption('Ice Mud Game')
+        self.game_server.send_packet('L:' + self.thePlayerData.name)
         while self.running:
             self.tick(time.time() - self.startTime)
             clock.tick(FPS)
@@ -292,16 +295,37 @@ class Display:
         '''
         结束游戏，使show调用返回
         '''
+        self.game_server.send_packet('E:')
         self.running = False
+
+    def read_player_data(self, data: list, message: str):
+        packed_data = message.split('\x00')[:-1:]
+        data_dict = {}
+        for packed in packed_data:
+            name = packed[16::]
+            data_dict[name] = packed[:16:]
+        for player in data:
+            if player.name in data_dict:
+                packed = base64.b64decode(data_dict[player.name])
+                player.speed, player.rotation, player.time = struct.unpack('3f', packed)
+                player.update_tick(self.last_tick)
+                data_dict.pop(player.name)
+            else:
+                data.remove(player)
+        for name, packed in data_dict.items():
+            player = PlayerData(name)
+            player.speed, player.rotation, player.time = struct.unpack('3f', base64.b64decode(packed))
+            player.update_tick(self.last_tick)
+            data.append(player)
 
 
 def nop():
     pass
 
 
-player_data = [PlayerData("Player1"), PlayerData('玩家2')]
+player_data = [PlayerData("Player" + str(random.randrange(1000, 10000))), PlayerData('玩家2')]
 
-current_player_data = player_data[0]
+current_player = player_data[0]
 
 
 def get_data():
@@ -309,21 +333,20 @@ def get_data():
 
 
 def up():
-    current_player_data.speed += 50 + 5 * random.random()
+    current_player.speed += 50 + 5 * random.random()
 
 
 def down():
-    current_player_data.speed -= 50 + 5 * random.random()
+    current_player.speed -= 50 + 5 * random.random()
 
 
 def left():
-    current_player_data.rotation += 0.1
+    current_player.rotation += 0.1
 
 
 def right():
-    current_player_data.rotation -= 0.1
+    current_player.rotation -= 0.1
 
 
-if __name__ == "__main__":
-    display = Display(time.time() - 4, get_data, up, nop, down, nop, left, nop, right, nop)
-    display.show()
+def dummy_display(game_server):
+    return Display(time.time() - 4, get_data, current_player, up, nop, down, nop, left, nop, right, nop, game_server)
