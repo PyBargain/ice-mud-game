@@ -234,7 +234,8 @@ class Display:
         '''
         快上车
         '''
-        carImage = pygame.image.load('car.png').convert(32, SRCALPHA)
+        carImage = pygame.image.load(
+            'mycar.png' if player_data.name is self.thePlayerData.name else "car.png").convert(32, SRCALPHA)
         rotatedCar = pygame.transform.rotate(carImage, player_data.rotation * 180 / math.pi)
         carRect = rotatedCar.get_rect()
         carRect.center = self.calculate_offset(player_data.pos_x, player_data.pos_y)
@@ -259,7 +260,9 @@ class Display:
         所有的车
         '''
         for player_data in self.getData():
-            self.draw_car(player_data)
+            if (player_data.name != self.thePlayerData.name):
+                self.draw_car(player_data)
+        self.draw_car(self.thePlayerData)
 
     def tick_player(self, t):
         '''
