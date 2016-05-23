@@ -17,7 +17,7 @@ class ClientPacketControl():
 
 class ClientPacketLogin():
     def receive_message(self, request_message, server_address, game_client):
-        game_client.display.read_player_data(game_client.display.getData(), request_message)
+        game_client.display.startTime = float(request_message)
 
 
 class GameClient():
@@ -36,7 +36,7 @@ class GameClient():
 
     def __init__(self):
         self.host = "127.0.0.1"
-        self.port = 23344
+        self.port = 23345
 
     def send_packet(self, message):
         print("(Client)", self.socket.getsockname(), message)
