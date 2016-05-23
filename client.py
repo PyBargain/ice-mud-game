@@ -1,3 +1,6 @@
+#! /usr/bin/python3
+# coding=utf-8
+
 import socket, threading, base64, struct
 import game
 

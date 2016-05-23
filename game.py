@@ -1,8 +1,8 @@
 #! /usr/bin/python3
 # coding=utf-8
 
-
-import math, time, base64, struct
+import base64, struct
+import math, time
 import random
 
 import pygame

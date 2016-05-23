@@ -1,11 +1,9 @@
-import socket
-import socketserver
+#! /usr/bin/python3
+# coding=utf-8
+
+import socket, socketserver, threading, base64, struct
+import math, time
 import game
-import math
-import time
-import threading
-import struct
-import base64
 
 
 class ServerPacketLogout():
