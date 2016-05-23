@@ -11,7 +11,6 @@ class ServerPacketLogout():
         if client_address in game_server.map.player_data.keys():
             game_server.map.players.remove(game_server.map.player_data[client_address].name)
             game_server.map.player_data.pop(client_address)
-            return "Bye. "
         return None
 
 
@@ -57,7 +56,7 @@ class GameServer():
 
     def __init__(self):
         self.host = "127.0.0.1"
-        self.port = 23345
+        self.port = 23344
         self.map = RaceMap(self)
 
     def create_handler(self, request, client_address, server):
@@ -65,16 +64,16 @@ class GameServer():
 
     def run(self):
         self.socket = socketserver.ThreadingTCPServer((self.host, self.port), self.create_handler)
-        network_thread = threading.Thread(target=self.socket.serve_forever)
-        network_thread.start()
+        print("Starting server... ")
+        threading.Thread(target=self.socket.serve_forever).start()
         self.map.run()
-        print("Stop server... ")
-        self.stop()
+        print("Stopping server... ")
+        self.socket.shutdown()
 
     def stop(self):
         self.socket.shutdown()
 
-    class Handler(socketserver.BaseRequestHandler):
+    class Handler(socketserver.StreamRequestHandler):
         packet_types = {'L': ServerPacketLogin, 'C': ServerPacketControl, 'E': ServerPacketLogout}
 
         def __init__(self, request, client_address, server, game_server):
@@ -84,15 +83,7 @@ class GameServer():
         def handle(self):
             message_pool = ""
             while self.game_server.map.running:
-                message = str(self.request.recv(128), "utf-8")
-
-                if not message: break
-                message_pool += message
-
-                if '\n' not in message_pool: continue
-                index = message_pool.index('\n')
-                message = message_pool[:index:]
-                message_pool = message_pool[index + 1::]
+                message = str(self.rfile.readline().strip(), "utf-8")
 
                 print("(Client)", repr(self.client_address), message)
                 packet_handler = self.packet_types[message[0]]()
@@ -101,7 +92,8 @@ class GameServer():
                     break
                 else:
                     print("(Server)", repr(self.server.server_address), message[0] + message[1] + new_message)
-                    self.request.sendall(bytes(message[0] + message[1] + new_message + '\n', "utf-8"))
+                    self.wfile.write(bytes(message[0] + message[1] + new_message + '\n', "utf-8"))
+            print("(Closed)", self.client_address)
 
 
 class PlayerDataServer(game.PlayerData):

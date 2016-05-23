@@ -36,8 +36,7 @@ class GameClient():
 
     def __init__(self):
         self.host = "127.0.0.1"
-        self.port = 23345
-        self.running = True
+        self.port = 23344
 
     def send_packet(self, message):
         print("(Client)", self.socket.getsockname(), message)
@@ -49,7 +48,7 @@ class GameClient():
         def run_socket(game_client):
             message_pool = ""
             while 1:
-                message = str(game_client.socket.recv(1024), "utf-8")
+                message = str(game_client.socket.recv(128), "utf-8")
 
                 if not message: break
                 message_pool += message
