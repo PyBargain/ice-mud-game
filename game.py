@@ -227,6 +227,7 @@ class Display:
         self.game_server = game_server
         self.last_tick = time.time() - self.startTime
         self.running = True
+        self.state_changed = True
 
         self.map_width = 0
         self.map_height = 0
@@ -235,6 +236,7 @@ class Display:
         '''
         响应键盘事件
         '''
+        self.state_changed = False
         for event in pygame.event.get():
             if event.type == KEYUP:
                 if event.key in self.onKeyUp:
@@ -244,6 +246,12 @@ class Display:
             if event.type == KEYDOWN:
                 if event.key in self.onKeyDown:
                     self.onKeyDown[event.key]()
+            self.state_changed = True
+
+    def send_changes(self):
+        if self.state_changed:
+            packed = struct.pack('3f', self.thePlayerData.time, self.thePlayerData.speed, self.thePlayerData.rotation)
+            self.game_server.send_packet("C:" + str(base64.b64encode(packed), "utf-8"))
 
     def calculate_offset(self, pos_x, pos_y):
         x = min(max(WINMIDX - self.thePlayerData.pos_x, WINDOWWIDTH - self.map_width), 0) + pos_x
@@ -264,7 +272,8 @@ class Display:
         '''
         快上车
         '''
-        carImage = pygame.image.load('car.png').convert(32, SRCALPHA)
+        carImage = pygame.image.load(
+            'mycar.png' if player_data.name is self.thePlayerData.name else "car.png").convert(32, SRCALPHA)
         rotatedCar = pygame.transform.rotate(carImage, player_data.rotation * 180 / math.pi)
         carRect = rotatedCar.get_rect()
         carRect.center = self.calculate_offset(player_data.pos_x, player_data.pos_y)
@@ -289,7 +298,9 @@ class Display:
         所有的车
         '''
         for player_data in self.getData():
-            self.draw_car(player_data)
+            if (player_data.name != self.thePlayerData.name):
+                self.draw_car(player_data)
+        self.draw_car(self.thePlayerData)
 
     def tick_player(self, t):
         '''
@@ -306,6 +317,7 @@ class Display:
         self.handle_key()
         # tick player
         self.tick_player(t)
+        self.send_changes()
         # draw
         self.draw_map(self.thePlayerData)
         self.draw_building(self.thePlayerData)
@@ -324,6 +336,7 @@ class Display:
         clock = pygame.time.Clock()
         pygame.display.set_caption('Ice Mud Game')
         self.game_server.send_packet('L:' + self.thePlayerData.name)
+        self.send_changes()
         while self.running:
             self.tick(time.time() - self.startTime)
             clock.tick(FPS)
@@ -336,28 +349,31 @@ class Display:
         self.game_server.send_packet('E:')
         self.running = False
 
-    def read_player_data(self, data:
-        list, message
-
-    : str):
-    packed_data = message.split('\x00')[:-1:]
-    data_dict = {}
-    for packed in packed_data:
-        name = packed[16::]
-        data_dict[name] = packed[:16:]
-    for player in data:
-        if player.name in data_dict:
-            packed = base64.b64decode(data_dict[player.name])
-            player.speed, player.rotation, player.time = struct.unpack('3f', packed)
+    def read_player_data(self, data, message):
+        packed_data = message.split('\x00')[:-1:]
+        data_dict = {}
+        for packed in packed_data:
+            name = packed[28::]
+            data_dict[name] = packed[:28:]
+        for player in data:
+            if player.name in data_dict:
+                packed = base64.b64decode(data_dict[player.name])
+                pos_x, pos_y, player.speed, player.rotation, player.time = struct.unpack('5f', packed)
+                player.pos_x = pos_x
+                player.pos_y = pos_y
+                player.update_tick(self.last_tick)
+                data_dict.pop(player.name)
+            else:
+                data.remove(player)
+        for name, packed in data_dict.items():
+            player = PlayerData(name)
+            pos_x, pos_y, player.speed, player.rotation, player.time = struct.unpack('5f', base64.b64decode(packed))
+            player.pos_x = pos_x
+            player.pos_y = pos_y
             player.update_tick(self.last_tick)
             data_dict.pop(player.name)
         else:
             data.remove(player)
-    for name, packed in data_dict.items():
-        player = PlayerData(name)
-        player.speed, player.rotation, player.time = struct.unpack('3f', base64.b64decode(packed))
-        player.update_tick(self.last_tick)
-        data.append(player)
 
 def nop():
     pass

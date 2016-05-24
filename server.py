@@ -23,7 +23,6 @@ class ServerPacketControl():
             player_data.time = timestamp
             player_data.speed = speed
             player_data.rotation = rotation
-            player_data.update_tick(game_server.map.last_tick)
             return game_server.map.write_player_data(game_server.map.player_data)
         else:
             return None
@@ -37,7 +36,7 @@ class ServerPacketLogin():
         else:
             game_server.map.player_data[client_address] = PlayerDataServer(name, client_address)
             game_server.map.players.append(name)
-            return game_server.map.write_player_data(game_server.map.player_data)
+            return str(game_server.map.start_time)
 
 
 class GameServer():
@@ -56,7 +55,7 @@ class GameServer():
 
     def __init__(self):
         self.host = "127.0.0.1"
-        self.port = 23344
+        self.port = 23345
         self.map = RaceMap(self)
 
     def create_handler(self, request, client_address, server):
@@ -114,7 +113,9 @@ class RaceMap():
     def write_player_data(self, data):
         message = ''
         for player_data in data.values():
-            packed_data = struct.pack('3f', player_data.speed, player_data.rotation, player_data.time)
+            packed_data = struct.pack('5f',
+                                      player_data.pos_x, player_data.pos_y, player_data.speed,
+                                      player_data.rotation, player_data.time)
             message += str(base64.b64encode(packed_data), "utf-8")
             message += player_data.name
             message += '\x00'
