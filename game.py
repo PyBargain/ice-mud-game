@@ -205,181 +205,182 @@ class PlayerData:
         self.pos_x = dt * self.motion_x #碰撞导致漂移
         self.pos_y = dt * self.motion_y
 
-    class Display:
-        def __init__(self, startTime, getData, thePlayerData, upDown, upUp, downDown, downUp,
-                     leftDown, leftUp, rightDown, rightUp, game_server):
-            '''
-            产生一个display对象
 
-            参数：
-                startTime 游戏时间为0时的UNIX时间戳
-                getData   返回值为[(昵称, 游戏时间, 赛车X, 赛车X速度, 赛车Y, 赛车Y速度, 赛车方向), ...]的函数
-                upDown    方向键“上”被按下时的处理函数
-                ...       ...
-            '''
-            self.startTime = startTime
-            self.getData = getData
-            self.thePlayerData = thePlayerData
-            self.onKeyDown = {K_UP: upDown, K_DOWN: downDown, K_LEFT: leftDown, K_RIGHT: rightDown}
-            self.onKeyUp = {K_UP: upUp, K_DOWN: downUp, K_LEFT: leftUp, K_RIGHT: rightUp}
-            self.surf = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
-            self.game_server = game_server
-            self.last_tick = time.time() - self.startTime
-            self.running = True
+class Display:
+    def __init__(self, startTime, getData, thePlayerData, upDown, upUp, downDown, downUp,
+                 leftDown, leftUp, rightDown, rightUp, game_server):
+        '''
+        产生一个display对象
 
-            self.map_width = 0
-            self.map_height = 0
+        参数：
+            startTime 游戏时间为0时的UNIX时间戳
+            getData   返回值为[(昵称, 游戏时间, 赛车X, 赛车X速度, 赛车Y, 赛车Y速度, 赛车方向), ...]的函数
+            upDown    方向键“上”被按下时的处理函数
+            ...       ...
+        '''
+        self.startTime = startTime
+        self.getData = getData
+        self.thePlayerData = thePlayerData
+        self.onKeyDown = {K_UP: upDown, K_DOWN: downDown, K_LEFT: leftDown, K_RIGHT: rightDown}
+        self.onKeyUp = {K_UP: upUp, K_DOWN: downUp, K_LEFT: leftUp, K_RIGHT: rightUp}
+        self.surf = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
+        self.game_server = game_server
+        self.last_tick = time.time() - self.startTime
+        self.running = True
 
-        def handle_key(self):
-            '''
-            响应键盘事件
-            '''
-            for event in pygame.event.get():
-                if event.type == KEYUP:
-                    if event.key in self.onKeyUp:
-                        self.onKeyUp[event.key]()
-                    if event.key == K_ESCAPE:
-                        self.stop()
-                if event.type == KEYDOWN:
-                    if event.key in self.onKeyDown:
-                        self.onKeyDown[event.key]()
+        self.map_width = 0
+        self.map_height = 0
 
-        def calculate_offset(self, pos_x, pos_y):
-            x = min(max(WINMIDX - self.thePlayerData.pos_x, WINDOWWIDTH - self.map_width), 0) + pos_x
-            y = min(max(WINMIDY - self.thePlayerData.pos_y, WINDOWHEIGHT - self.map_height), 0) + pos_y
-            return (x, y)
+    def handle_key(self):
+        '''
+        响应键盘事件
+        '''
+        for event in pygame.event.get():
+            if event.type == KEYUP:
+                if event.key in self.onKeyUp:
+                    self.onKeyUp[event.key]()
+                if event.key == K_ESCAPE:
+                    self.stop()
+            if event.type == KEYDOWN:
+                if event.key in self.onKeyDown:
+                    self.onKeyDown[event.key]()
 
-        def draw_map(self, player_data):
-            '''
-            背景图
-            '''
-            mapImage = pygame.image.load('map.png').convert(32, SRCALPHA)
-            mapRect = mapImage.get_rect()
-            self.map_width, self.map_height = mapRect[2], mapRect[3]
-            mapRect.topleft = self.calculate_offset(0, 0)
-            self.surf.blit(mapImage, mapRect)
+    def calculate_offset(self, pos_x, pos_y):
+        x = min(max(WINMIDX - self.thePlayerData.pos_x, WINDOWWIDTH - self.map_width), 0) + pos_x
+        y = min(max(WINMIDY - self.thePlayerData.pos_y, WINDOWHEIGHT - self.map_height), 0) + pos_y
+        return (x, y)
 
-        def draw_car(self, player_data):
-            '''
-            快上车
-            '''
-            carImage = pygame.image.load('car.png').convert(32, SRCALPHA)
-            rotatedCar = pygame.transform.rotate(carImage, player_data.rotation * 180 / math.pi)
-            carRect = rotatedCar.get_rect()
-            carRect.center = self.calculate_offset(player_data.pos_x, player_data.pos_y)
-            self.surf.blit(rotatedCar, carRect)
-            font = pygame.font.Font('font/wqy-microhei.ttc', 18)
-            nameSurf = font.render(player_data.name, True, NAMECOLOR)
-            nameRect = nameSurf.get_rect()
-            nameRect.center = self.calculate_offset(player_data.pos_x, player_data.pos_y - 48)
-            # FIXME: 这里还有点问题，先去掉
-            # surf.fill(NAMEBG, nameRect)
-            self.surf.blit(nameSurf, nameRect)
+    def draw_map(self, player_data):
+        '''
+        背景图
+        '''
+        mapImage = pygame.image.load('map.png').convert(32, SRCALPHA)
+        mapRect = mapImage.get_rect()
+        self.map_width, self.map_height = mapRect[2], mapRect[3]
+        mapRect.topleft = self.calculate_offset(0, 0)
+        self.surf.blit(mapImage, mapRect)
 
-        def draw_building(self, player_data):
-            '''
-            建筑物
-            '''
-            # TODO: Your work, FasdSnake
-            pass
+    def draw_car(self, player_data):
+        '''
+        快上车
+        '''
+        carImage = pygame.image.load('car.png').convert(32, SRCALPHA)
+        rotatedCar = pygame.transform.rotate(carImage, player_data.rotation * 180 / math.pi)
+        carRect = rotatedCar.get_rect()
+        carRect.center = self.calculate_offset(player_data.pos_x, player_data.pos_y)
+        self.surf.blit(rotatedCar, carRect)
+        font = pygame.font.Font('font/wqy-microhei.ttc', 18)
+        nameSurf = font.render(player_data.name, True, NAMECOLOR)
+        nameRect = nameSurf.get_rect()
+        nameRect.center = self.calculate_offset(player_data.pos_x, player_data.pos_y - 48)
+        # FIXME: 这里还有点问题，先去掉
+        # surf.fill(NAMEBG, nameRect)
+        self.surf.blit(nameSurf, nameRect)
 
-        def draw_cars(self):
-            '''
-            所有的车
-            '''
-            for player_data in self.getData():
-                self.draw_car(player_data)
-
-        def tick_player(self, t):
-            '''
-            玩家逻辑
-            '''
-            for player_data in self.getData():
-                player_data.update_tick(t)
-
-        def tick(self, t):
-            '''
-            Game loop
-            '''
-            # key events
-            self.handle_key()
-            # tick player
-            self.tick_player(t)
-            # draw
-            self.draw_map(self.thePlayerData)
-            self.draw_building(self.thePlayerData)
-            self.draw_cars()
-            # update
-            pygame.display.update()
-            self.last_tick = t
-
-        def show(self):
-            '''
-            循环显示游戏界面
-
-            此函数直到stop被调用后才会返回
-            '''
-            pygame.init()
-            clock = pygame.time.Clock()
-            pygame.display.set_caption('Ice Mud Game')
-            self.game_server.send_packet('L:' + self.thePlayerData.name)
-            while self.running:
-                self.tick(time.time() - self.startTime)
-                clock.tick(FPS)
-            pygame.quit()
-
-        def stop(self):
-            '''
-            结束游戏，使show调用返回
-            '''
-            self.game_server.send_packet('E:')
-            self.running = False
-
-        def read_player_data(self, data:
-            list, message
-
-        : str):
-        packed_data = message.split('\x00')[:-1:]
-        data_dict = {}
-        for packed in packed_data:
-            name = packed[16::]
-            data_dict[name] = packed[:16:]
-        for player in data:
-            if player.name in data_dict:
-                packed = base64.b64decode(data_dict[player.name])
-                player.speed, player.rotation, player.time = struct.unpack('3f', packed)
-                player.update_tick(self.last_tick)
-                data_dict.pop(player.name)
-            else:
-                data.remove(player)
-        for name, packed in data_dict.items():
-            player = PlayerData(name)
-            player.speed, player.rotation, player.time = struct.unpack('3f', base64.b64decode(packed))
-            player.update_tick(self.last_tick)
-            data.append(player)
-
-    def nop():
+    def draw_building(self, player_data):
+        '''
+        建筑物
+        '''
+        # TODO: Your work, FasdSnake
         pass
 
-    player_data = [PlayerData("Player" + str(random.randrange(1000, 10000))), PlayerData('玩家2')]
+    def draw_cars(self):
+        '''
+        所有的车
+        '''
+        for player_data in self.getData():
+            self.draw_car(player_data)
 
-    current_player = player_data[0]
+    def tick_player(self, t):
+        '''
+        玩家逻辑
+        '''
+        for player_data in self.getData():
+            player_data.update_tick(t)
 
-    def get_data():
-        return player_data
+    def tick(self, t):
+        '''
+        Game loop
+        '''
+        # key events
+        self.handle_key()
+        # tick player
+        self.tick_player(t)
+        # draw
+        self.draw_map(self.thePlayerData)
+        self.draw_building(self.thePlayerData)
+        self.draw_cars()
+        # update
+        pygame.display.update()
+        self.last_tick = t
 
-    def up():
-        current_player.speed += 50 + 5 * random.random()
+    def show(self):
+        '''
+        循环显示游戏界面
 
-    def down():
-        current_player.speed -= 50 + 5 * random.random()
+        此函数直到stop被调用后才会返回
+        '''
+        pygame.init()
+        clock = pygame.time.Clock()
+        pygame.display.set_caption('Ice Mud Game')
+        self.game_server.send_packet('L:' + self.thePlayerData.name)
+        while self.running:
+            self.tick(time.time() - self.startTime)
+            clock.tick(FPS)
+        pygame.quit()
 
-    def left():
-        current_player.rotation += 0.1
+    def stop(self):
+        '''
+        结束游戏，使show调用返回
+        '''
+        self.game_server.send_packet('E:')
+        self.running = False
 
-    def right():
-        current_player.rotation -= 0.1
+    def read_player_data(self, data:
+        list, message
 
-    def dummy_display(game_server):
-        return Display(time.time() - 4, get_data, current_player, up, nop, down, nop, left, nop, right, nop,
-                       game_server)
+    : str):
+    packed_data = message.split('\x00')[:-1:]
+    data_dict = {}
+    for packed in packed_data:
+        name = packed[16::]
+        data_dict[name] = packed[:16:]
+    for player in data:
+        if player.name in data_dict:
+            packed = base64.b64decode(data_dict[player.name])
+            player.speed, player.rotation, player.time = struct.unpack('3f', packed)
+            player.update_tick(self.last_tick)
+            data_dict.pop(player.name)
+        else:
+            data.remove(player)
+    for name, packed in data_dict.items():
+        player = PlayerData(name)
+        player.speed, player.rotation, player.time = struct.unpack('3f', base64.b64decode(packed))
+        player.update_tick(self.last_tick)
+        data.append(player)
+
+def nop():
+    pass
+
+player_data = [PlayerData("Player" + str(random.randrange(1000, 10000))), PlayerData('玩家2')]
+
+current_player = player_data[0]
+
+def get_data():
+    return player_data
+
+def up():
+    current_player.speed += 50 + 5 * random.random()
+
+def down():
+    current_player.speed -= 50 + 5 * random.random()
+
+def left():
+    current_player.rotation += 0.1
+
+def right():
+    current_player.rotation -= 0.1
+
+def dummy_display(game_server):
+    return Display(time.time() - 4, get_data, current_player, up, nop, down, nop, left, nop, right, nop,
+                   game_server)
