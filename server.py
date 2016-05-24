@@ -127,6 +127,11 @@ class RaceMap():
         '''
         for player_data in self.player_data.values():
             player_data.update_tick(t)
+            player_data.check_collision(t) #碰撞判断
+
+    def get_map_data(self, map_data): #这个函数在game.py 里调用
+
+        #TODO：->_->讲道理我现在不知道怎么拿到map，我希望的map格式在game.py里有写
 
     def handle_key(self):
         pass

@@ -8,6 +8,8 @@ import random
 import pygame
 from pygame.locals import *
 
+import server
+
 WINDOWWIDTH = 640
 WINDOWHEIGHT = 480
 WINMIDX = WINDOWWIDTH / 2
@@ -16,6 +18,7 @@ NAMECOLOR = (255, 255, 255)
 NAMEBG = (64, 64, 64)
 FPS = 30
 CAMERAH = 10
+CARRADIUM = 64
 
 
 class Building:
@@ -154,6 +157,12 @@ class PlayerData:
         # rotation in rad
         self.rotation = 0
 
+        self.map_data = [] #FIXME：我希望的地图格式：一个列表[*,*,*,...,*]，奇数位置上的*相当于各个像素点处的is_wall变量，其排布为从左上角像素开始，每过一个*，相应的像素点向右平移一格，直到右边界处“换行”到下一行，到右下角像素为止；奇数位*后面紧跟着的*是奇数位*对应的像素点处的墙（如果有）的方向角，角度制表示，水平向右为角度零点，逆时针方向上角度增加...你应该看懂了吧...看不懂qq问我
+
+        self.is_wall = 0 #参见下面
+
+        self.wall_angle = 0
+
     def update_tick(self, time):
         dt = self.time - time
         self.time = time
@@ -166,6 +175,35 @@ class PlayerData:
             self.rotation = math.acos(self.motion_y / self.speed) \
                 if self.motion_x > 0 \
                 else - math.acos(self.motion_y / self.speed)
+
+    def check_collision(self, time):
+        '''
+        撞！
+        '''
+        race_map = server.RaceMap() #race_map的变量初始化
+        self.map_data = server.RaceMap.get_map_data(race_map, map_data) #引用了server里面的get_map_data函数作没卵用的赋值
+        dt = self.time - time
+        self.is_wall = self.map_data[2 * (self.pos_y * WINDOWWIDTH + self.pos_x)] #FIXME：->_->为便于修改，这里定义了两个变量作控制变量，wzb你给不出我希望的地图格式的话，可以修改这里
+        self.wall_angle = self.map_data[2 * (self.pos_y * WINDOWWIDTH + self.pos_x) + 1]
+        if self.pos_x * self.pos_y == 0 or (WINDOWWIDTH - 1 - self.pos_x) * (WINDOWHEIGHT - 1 - self.pos_y) == 0: #这里是外边界处的碰撞判断
+            if self.pos_x == 0: #这些应该能懂，不懂参见下面...
+                self.motion_x = 0
+                self.motion_y *= 0.5
+            elif self.pos_y == 0:
+                self.motion_y == 0
+                self.motion_x *= 0.5
+            elif self.pos_x == WINDOWWIDTH - 1:
+                self.motion_x = 0
+                self.motion_y *= 0.5
+            elif self.pos_y == WINDOWHEIGHT - 1:
+                self.motion_y == 0
+                self.motion_x *= 0.5
+        else #这里是其它位置的碰撞判断
+            if self.is_wall == 1:
+                self.motion_x *= math.cos(self.wall_angle) / 2 #碰撞导致减速，1/2的目的是使碰撞削减速度（防止碰撞的惩罚措施）
+                self.motion_y *= math.sin(self.wall_angle) / 2
+        self.pos_x = dt * self.motion_x #碰撞导致漂移
+        self.pos_y = dt * self.motion_y
 
 
 class Display:
@@ -333,37 +371,32 @@ class Display:
             player.pos_x = pos_x
             player.pos_y = pos_y
             player.update_tick(self.last_tick)
-            data.append(player)
-
+            data_dict.pop(player.name)
+        else:
+            data.remove(player)
 
 def nop():
     pass
-
 
 player_data = [PlayerData("Player" + str(random.randrange(1000, 10000))), PlayerData('玩家2')]
 
 current_player = player_data[0]
 
-
 def get_data():
     return player_data
-
 
 def up():
     current_player.speed += 50 + 5 * random.random()
 
-
 def down():
     current_player.speed -= 50 + 5 * random.random()
-
 
 def left():
     current_player.rotation += 0.1
 
-
 def right():
     current_player.rotation -= 0.1
 
-
 def dummy_display(game_server):
-    return Display(time.time() - 4, get_data, current_player, up, nop, down, nop, left, nop, right, nop, game_server)
+    return Display(time.time() - 4, get_data, current_player, up, nop, down, nop, left, nop, right, nop,
+                   game_server)
