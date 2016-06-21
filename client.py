@@ -1,27 +1,13 @@
 #! /usr/bin/python3
 # coding=utf-8
 
-import socket, threading, base64, struct
+import socket
+import threading
 import game
 
 
-class ClientPacketLogout():
-    def receive_message(self, request_message, client_address, game_client):
-        pass
-
-
-class ClientPacketControl():
-    def receive_message(self, request_message, client_address, game_client):
-        game_client.display.read_player_data(game_client.display.getData(), request_message)
-
-
-class ClientPacketLogin():
-    def receive_message(self, request_message, server_address, game_client):
-        game_client.display.startTime = float(request_message)
-
-
-class GameClient():
-    '''
+class GameClient:
+    """
     Three Steps:
 
             Client: send_packet
@@ -32,11 +18,26 @@ class GameClient():
 
             Client: receive_message
     Server ------------------------> Client
-    '''
+    """
+
+    class ClientPacketLogout:
+        @staticmethod
+        def receive_message(request_message, client_address, game_client):
+            pass
+
+    class ClientPacketControl:
+        @staticmethod
+        def receive_message(request_message, client_address, game_client):
+            game_client.display.read_player_data(game_client.display.getData(), request_message)
+
+    class ClientPacketLogin:
+        @staticmethod
+        def receive_message(request_message, server_address, game_client):
+            game_client.display.startTime = float(request_message)
 
     def __init__(self):
         self.host = "127.0.0.1"
-        self.port = 23345
+        self.port = 23344
 
     def send_packet(self, message):
         print("(Client)", self.socket.getsockname(), message)
@@ -44,7 +45,10 @@ class GameClient():
 
     def run(self):
         self.socket = sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        packet_types = {'L': ClientPacketLogin, 'C': ClientPacketControl, 'E': ClientPacketLogout}
+        packet_types = {'L': self.ClientPacketLogin,
+                        'C': self.ClientPacketControl,
+                        'E': self.ClientPacketLogout}
+
         def run_socket(game_client):
             message_pool = ""
             while 1:
@@ -60,7 +64,7 @@ class GameClient():
 
                 address = (game_client.host, game_client.port)
                 print("(Server)", repr(address), message)
-                packet_types[message[0]]().receive_message(message[2::], address, game_client)
+                packet_types[message[0]].receive_message(message[2::], address, game_client)
 
         try:
             sock.connect((self.host, self.port))

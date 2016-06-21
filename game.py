@@ -1,29 +1,34 @@
 #! /usr/bin/python3
 # coding=utf-8
 
-import base64, struct
-import math, time
+import base64
+import struct
+import math
+import time
 import random
 
 import pygame
 from pygame.locals import *
 
-import server
+# import server
 
 WINDOWWIDTH = 640
 WINDOWHEIGHT = 480
 WINMIDX = WINDOWWIDTH / 2
 WINMIDY = WINDOWHEIGHT / 2
+
 NAMECOLOR = (255, 255, 255)
 NAMEBG = (64, 64, 64)
+
 FPS = 30
+
 CAMERAH = 10
 CARRADIUM = 64
 
 
 class Building:
     def __init__(self, rect, height, image):
-        '''
+        """
         产生一个建筑物对象
 
         参数：
@@ -32,7 +37,7 @@ class Building:
             image   建筑物的表面贴图方案
 
         我们假定摄像机位于高度10处
-        '''
+        """
         self.rect = rect
         self.height = height
         # TODO: SMG->_->, by ustc-zzzz
@@ -43,21 +48,21 @@ class Building:
         self._screenr.h *= self.scale
 
     def toprect(self, x, y):
-        '''
+        """
         返回镜头位于特定坐标时，建筑物顶部在屏幕上的矩形
 
         返回的对象可能会在未来被改变
-        '''
+        """
         self._screenr.centerx = (WINMIDX + self.rect.centerx - x) * self.scale
         self._screenr.centery = (WINMIDY + self.rect.centery - y) * self.scale
         return self._screenr
 
     def side(self, x, y):
-        '''
+        """
         返回用于遮挡解算的信息(ld, rd, lw, rw)
             (ld, rd)    正上方为最小值，顺时针方向递增的两个类角度量，刻画了镜头位于特定坐标时该建筑物所占据的视角
             (lw, rw)    该建筑物所占据的视角最两侧的点到镜头的类距离
-        '''
+        """
         left = self.rect.left
         right = self.rect.right
         top = self.rect.top
@@ -97,9 +102,9 @@ class Building:
         return (ld, rd, lw, rw)
 
     def draw(self, x, y, display):
-        '''
+        """
         将建筑物绘制在display上
-        '''
+        """
         rect = self.rect
         toprect = self.toprect(x, y)
         if x > rect.right:
@@ -132,9 +137,9 @@ class Building:
 
 
 class PlayerData:
-    '''
+    """
     玩家数据
-    '''
+    """
 
     def __init__(self, name):
         # name
@@ -157,9 +162,7 @@ class PlayerData:
         # rotation in rad
         self.rotation = 0
 
-        self.map_data = [] #FIXME：我希望的地图格式：一个列表[*,*,*,...,*]，奇数位置上的*相当于各个像素点处的is_wall变量，其排布为从左上角像素开始，每过一个*，相应的像素点向右平移一格，直到右边界处“换行”到下一行，到右下角像素为止；奇数位*后面紧跟着的*是奇数位*对应的像素点处的墙（如果有）的方向角，角度制表示，水平向右为角度零点，逆时针方向上角度增加...你应该看懂了吧...看不懂qq问我
-
-        self.is_wall = 0 #参见下面
+        self.is_wall = 0  # 参见下面
 
         self.wall_angle = 0
 
@@ -170,46 +173,52 @@ class PlayerData:
         self.motion_y = self.speed * math.cos(self.rotation)
         self.pos_x += dt * self.motion_x
         self.pos_y += dt * self.motion_y
-        self.speed = math.sqrt(self.motion_x ** 2 + self.motion_y ** 2)
+        # self.speed = (1 if self.speed > 0 else -1) * math.sqrt(self.motion_x ** 2 + self.motion_y ** 2)
         if self.speed != 0:
-            self.rotation = math.acos(self.motion_y / self.speed) \
-                if self.motion_x > 0 \
-                else - math.acos(self.motion_y / self.speed)
+            self.rotation = self.rotation % (2 * math.pi)
 
-    def check_collision(self, time):
-        '''
+    def check_collision(self, time, map_data):
+        """
         撞！
-        '''
-        race_map = server.RaceMap() #race_map的变量初始化
-        self.map_data = server.RaceMap.get_map_data(race_map, map_data) #引用了server里面的get_map_data函数作没卵用的赋值
+        """
+        # FIXME：
+        # 我希望的地图格式：一个列表[*,*,*,...,*]，
+        # 奇数位置上的*相当于各个像素点处的is_wall变量，
+        # 其排布为从左上角像素开始，每过一个*，相应的像素点向右平移一格，
+        # 直到右边界处“换行”到下一行，到右下角像素为止；
+        # 奇数位*后面紧跟着的*是奇数位*对应的像素点处的墙（如果有）的方向角，
+        # 角度制表示，水平向右为角度零点，逆时针方向上角度增加...你应该看懂了吧...看不懂qq问我
         dt = self.time - time
-        self.is_wall = self.map_data[2 * (self.pos_y * WINDOWWIDTH + self.pos_x)] #FIXME：->_->为便于修改，这里定义了两个变量作控制变量，wzb你给不出我希望的地图格式的话，可以修改这里
-        self.wall_angle = self.map_data[2 * (self.pos_y * WINDOWWIDTH + self.pos_x) + 1]
-        if self.pos_x * self.pos_y == 0 or (WINDOWWIDTH - 1 - self.pos_x) * (WINDOWHEIGHT - 1 - self.pos_y) == 0: #这里是外边界处的碰撞判断
-            if self.pos_x == 0: #这些应该能懂，不懂参见下面...
+        self.is_wall = map_data[
+            2 * (self.pos_y * WINDOWWIDTH + self.pos_x)]  # FIXME：->_->为便于修改，这里定义了两个变量作控制变量，wzb你给不出我希望的地图格式的话，可以修改这里
+        self.wall_angle = map_data[2 * (self.pos_y * WINDOWWIDTH + self.pos_x) + 1]
+        if self.pos_x * self.pos_y == 0 or (WINDOWWIDTH - 1 - self.pos_x) * (
+                        WINDOWHEIGHT - 1 - self.pos_y) == 0:  # 这里是外边界处的碰撞判断
+            if self.pos_x == 0:  # 这些应该能懂，不懂参见下面...
                 self.motion_x = 0
                 self.motion_y *= 0.5
             elif self.pos_y == 0:
-                self.motion_y == 0
+                self.motion_y = 0
                 self.motion_x *= 0.5
             elif self.pos_x == WINDOWWIDTH - 1:
                 self.motion_x = 0
                 self.motion_y *= 0.5
             elif self.pos_y == WINDOWHEIGHT - 1:
-                self.motion_y == 0
+                self.motion_y = 0
                 self.motion_x *= 0.5
-        else #这里是其它位置的碰撞判断
+        else:  # 这里是其它位置的碰撞判断
             if self.is_wall == 1:
-                self.motion_x *= math.cos(self.wall_angle) / 2 #碰撞导致减速，1/2的目的是使碰撞削减速度（防止碰撞的惩罚措施）
+                self.motion_x *= math.cos(self.wall_angle) / 2  # 碰撞导致减速，1/2的目的是使碰撞削减速度（防止碰撞的惩罚措施）
                 self.motion_y *= math.sin(self.wall_angle) / 2
-        self.pos_x = dt * self.motion_x #碰撞导致漂移
+        self.speed = (1 if self.speed > 0 else -1) * math.sqrt(self.motion_x ** 2 + self.motion_y ** 2)
+        self.pos_x = dt * self.motion_x  # 碰撞导致漂移
         self.pos_y = dt * self.motion_y
 
 
 class Display:
     def __init__(self, startTime, getData, thePlayerData, upDown, upUp, downDown, downUp,
                  leftDown, leftUp, rightDown, rightUp, game_server):
-        '''
+        """
         产生一个display对象
 
         参数：
@@ -217,7 +226,7 @@ class Display:
             getData   返回值为[(昵称, 游戏时间, 赛车X, 赛车X速度, 赛车Y, 赛车Y速度, 赛车方向), ...]的函数
             upDown    方向键“上”被按下时的处理函数
             ...       ...
-        '''
+        """
         self.startTime = startTime
         self.getData = getData
         self.thePlayerData = thePlayerData
@@ -228,14 +237,15 @@ class Display:
         self.last_tick = time.time() - self.startTime
         self.running = True
         self.state_changed = True
+        self.theme = "normal"
 
         self.map_width = 0
         self.map_height = 0
 
     def handle_key(self):
-        '''
+        """
         响应键盘事件
-        '''
+        """
         self.state_changed = False
         for event in pygame.event.get():
             if event.type == KEYUP:
@@ -259,21 +269,21 @@ class Display:
         return (x, y)
 
     def draw_map(self, player_data):
-        '''
+        """
         背景图
-        '''
-        mapImage = pygame.image.load('map.png').convert(32, SRCALPHA)
+        """
+        mapImage = pygame.image.load(self.theme + '/map.png').convert(32, SRCALPHA)
         mapRect = mapImage.get_rect()
         self.map_width, self.map_height = mapRect[2], mapRect[3]
         mapRect.topleft = self.calculate_offset(0, 0)
         self.surf.blit(mapImage, mapRect)
 
     def draw_car(self, player_data):
-        '''
+        """
         快上车
-        '''
-        carImage = pygame.image.load(
-            'mycar.png' if player_data.name is self.thePlayerData.name else "car.png").convert(32, SRCALPHA)
+        """
+        carImagePath = self.theme + ('/mycar.png' if player_data.name is self.thePlayerData.name else "/car.png")
+        carImage = pygame.image.load(carImagePath).convert(32, SRCALPHA)
         rotatedCar = pygame.transform.rotate(carImage, player_data.rotation * 180 / math.pi)
         carRect = rotatedCar.get_rect()
         carRect.center = self.calculate_offset(player_data.pos_x, player_data.pos_y)
@@ -287,32 +297,32 @@ class Display:
         self.surf.blit(nameSurf, nameRect)
 
     def draw_building(self, player_data):
-        '''
+        """
         建筑物
-        '''
+        """
         # TODO: Your work, FasdSnake
         pass
 
     def draw_cars(self):
-        '''
+        """
         所有的车
-        '''
+        """
         for player_data in self.getData():
             if (player_data.name != self.thePlayerData.name):
                 self.draw_car(player_data)
         self.draw_car(self.thePlayerData)
 
     def tick_player(self, t):
-        '''
+        """
         玩家逻辑
-        '''
+        """
         for player_data in self.getData():
             player_data.update_tick(t)
 
     def tick(self, t):
-        '''
+        """
         Game loop
-        '''
+        """
         # key events
         self.handle_key()
         # tick player
@@ -327,11 +337,11 @@ class Display:
         self.last_tick = t
 
     def show(self):
-        '''
+        """
         循环显示游戏界面
 
         此函数直到stop被调用后才会返回
-        '''
+        """
         pygame.init()
         clock = pygame.time.Clock()
         pygame.display.set_caption('Ice Mud Game')
@@ -343,60 +353,68 @@ class Display:
         pygame.quit()
 
     def stop(self):
-        '''
+        """
         结束游戏，使show调用返回
-        '''
+        """
         self.game_server.send_packet('E:')
         self.running = False
 
     def read_player_data(self, data, message):
-        packed_data = message.split('\x00')[:-1:]
-        data_dict = {}
-        for packed in packed_data:
-            name = packed[28::]
-            data_dict[name] = packed[:28:]
-        for player in data:
-            if player.name in data_dict:
-                packed = base64.b64decode(data_dict[player.name])
-                pos_x, pos_y, player.speed, player.rotation, player.time = struct.unpack('5f', packed)
+        try:
+            packed_data = message.split('\x00')[:-1:]
+            data_dict = {}
+            for packed in packed_data:
+                name = packed[28::]
+                data_dict[name] = packed[:28:]
+            for player in data:
+                if player.name in data_dict:
+                    packed = base64.b64decode(data_dict[player.name])
+                    pos_x, pos_y, player.speed, player.rotation, player.time = struct.unpack('5f', packed)
+                    player.pos_x = pos_x
+                    player.pos_y = pos_y
+                    player.update_tick(self.last_tick)
+                    data_dict.pop(player.name)
+                else:
+                    data.remove(player)
+            for name, packed in data_dict.items():
+                player = PlayerData(name)
+                pos_x, pos_y, player.speed, player.rotation, player.time = struct.unpack('5f', base64.b64decode(packed))
                 player.pos_x = pos_x
                 player.pos_y = pos_y
                 player.update_tick(self.last_tick)
                 data_dict.pop(player.name)
-            else:
-                data.remove(player)
-        for name, packed in data_dict.items():
-            player = PlayerData(name)
-            pos_x, pos_y, player.speed, player.rotation, player.time = struct.unpack('5f', base64.b64decode(packed))
-            player.pos_x = pos_x
-            player.pos_y = pos_y
-            player.update_tick(self.last_tick)
-            data_dict.pop(player.name)
-        else:
-            data.remove(player)
+        except:
+            pass
+
 
 def nop():
     pass
+
 
 player_data = [PlayerData("Player" + str(random.randrange(1000, 10000))), PlayerData('玩家2')]
 
 current_player = player_data[0]
 
+
 def get_data():
     return player_data
+
 
 def up():
     current_player.speed += 50 + 5 * random.random()
 
+
 def down():
     current_player.speed -= 50 + 5 * random.random()
+
 
 def left():
     current_player.rotation += 0.1
 
+
 def right():
     current_player.rotation -= 0.1
 
+
 def dummy_display(game_server):
-    return Display(time.time() - 4, get_data, current_player, up, nop, down, nop, left, nop, right, nop,
-                   game_server)
+    return Display(time.time() - 4, get_data, current_player, up, nop, down, nop, left, nop, right, nop, game_server)
