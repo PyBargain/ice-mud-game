@@ -20,120 +20,10 @@ WINMIDY = WINDOWHEIGHT / 2
 NAMECOLOR = (255, 255, 255)
 NAMEBG = (64, 64, 64)
 
-FPS = 30
+FPS = 60
 
 CAMERAH = 10
 CARRADIUM = 64
-
-
-class Building:
-    def __init__(self, rect, height, image):
-        """
-        产生一个建筑物对象
-
-        参数：
-            rect    pygame的Rect对象，描述建筑物的底部矩形
-            height  建筑物高度
-            image   建筑物的表面贴图方案
-
-        我们假定摄像机位于高度10处
-        """
-        self.rect = rect
-        self.height = height
-        # TODO: SMG->_->, by ustc-zzzz
-        # self.side, self.top = BUILDINGIMG[image]
-        self.scale = CAMERAH / (CAMERAH - height)
-        self._screenr = pygame.rect.Rect(rect)
-        self._screenr.w *= self.scale
-        self._screenr.h *= self.scale
-
-    def toprect(self, x, y):
-        """
-        返回镜头位于特定坐标时，建筑物顶部在屏幕上的矩形
-
-        返回的对象可能会在未来被改变
-        """
-        self._screenr.centerx = (WINMIDX + self.rect.centerx - x) * self.scale
-        self._screenr.centery = (WINMIDY + self.rect.centery - y) * self.scale
-        return self._screenr
-
-    def side(self, x, y):
-        """
-        返回用于遮挡解算的信息(ld, rd, lw, rw)
-            (ld, rd)    正上方为最小值，顺时针方向递增的两个类角度量，刻画了镜头位于特定坐标时该建筑物所占据的视角
-            (lw, rw)    该建筑物所占据的视角最两侧的点到镜头的类距离
-        """
-        left = self.rect.left
-        right = self.rect.right
-        top = self.rect.top
-        bottom = self.rect.bottom
-
-        def calcdw(x, y):
-            return (x / y if y > x else 2 - y / x, x * x + y * y)
-
-        if x > left:
-            if y > bottom:
-                # l为左下角
-                ld, lw = 6 + calcdw(y - bottom, x - left)
-            if y < top:
-                # r为左上角
-                rd, rw = 4 + calcdw(x - left, top - y)
-        else:
-            if y > top:
-                # l为左上角
-                ld, lw = 0 + calcdw(left - x, y - top)
-            if y < bottom:
-                # r为左下角
-                rd, rw = 2 + calcdw(bottom - y, left - x)
-        if x > right:
-            if y < bottom:
-                # l为右下角
-                ld, lw = 4 + calcdw(x - right, bottom - y)
-            if y > top:
-                # r为右上角
-                rd, rw = 6 + calcdw(y - top, x - right)
-        else:
-            if y < top:
-                # l为右上角
-                ld, lw = 2 + calcdw(top - y, right - x)
-            if y > bottom:
-                # r为右下角
-                rd, rw = 0 + calcdw(y - bottom, right - x)
-        return (ld, rd, lw, rw)
-
-    def draw(self, x, y, display):
-        """
-        将建筑物绘制在display上
-        """
-        rect = self.rect
-        toprect = self.toprect(x, y)
-        if x > rect.right:
-            # 画左侧面
-            left = rect.left
-            ltop = rect.top
-            lbottom = rect.bottom
-            right = toprect.left
-            rtop = toprect.top
-            rbottom = toprect.bottom
-            width = right - left
-            for i in range(left, right):
-                top = (i - left) * (rtop - ltop) // width + ltop
-                bottom = (i - left) * (rbottom - lbottom) // width + lbottom
-                display.blit(pygame.transform.rotate(self.side, 90),
-                             Rect(i, top, 1, bottom - top),
-                             Rect((i - left) * self.side.height // width, 0, (self.side.height + width - 1) // width,
-                                  self.side.width))
-        elif x < rect.left:
-            # 画右侧面
-            pass
-        if y > rect.bottom:
-            # 画上侧面
-            pass
-        elif y < rect.top:
-            # 画下侧面
-            pass
-        # 画顶面
-        display.blit(self.top, toprect)
 
 
 class PlayerData:
@@ -145,16 +35,12 @@ class PlayerData:
         # name
         self.name = name
 
-        # second
+        # second, provides last update time
         self.time = 0
 
         # position
         self.pos_x = 200
         self.pos_y = 200
-
-        # speed
-        self.motion_x = 0
-        self.motion_y = 0
 
         # sqrt(self.motion_x ** 2 + self.motion_y ** 2)
         self.speed = 1
@@ -162,17 +48,46 @@ class PlayerData:
         # rotation in rad
         self.rotation = 0
 
-        self.is_wall = 0  # 参见下面
+    @property
+    def motion_x(self):
+        return self.speed * math.sin(self.rotation)
 
-        self.wall_angle = 0
+    @property
+    def motion_y(self):
+        return -self.speed * math.cos(self.rotation)
 
-    def update_tick(self, time):
-        dt = self.time - time
+    @motion_x.setter
+    def motion_x(self, x):
+        y = self.motion_y
+        if self.speed > 0:
+            self.speed = math.sqrt(x ** 2 + y ** 2)
+            if y < 0: self.rotation = math.asin(x / self.speed) % (2 * math.pi)
+            elif y > 0: self.rotation = math.pi - math.asin(x / self.speed)
+        elif self.speed < 0:
+            self.speed = -math.sqrt(x ** 2 + y ** 2)
+            if y > 0: self.rotation = -math.asin(-x / self.speed) % (2 * math.pi)
+            elif y < 0: self.rotation = math.asin(-x / self.speed) + math.pi
+
+    @motion_y.setter
+    def motion_y(self, y):
+        x = self.motion_x
+        if self.speed > 0:
+            self.speed = math.sqrt(x ** 2 + y ** 2)
+            if x < 0: self.rotation = 2 * math.pi - math.acos(-y / self.speed)
+            elif x > 0: self.rotation = math.acos(-y / self.speed)
+        elif self.speed < 0:
+            self.speed = -math.sqrt(x ** 2 + y ** 2)
+            if x > 0: self.rotation = math.acos(y / self.speed) + math.pi
+            elif x < 0: self.rotation = math.pi - math.acos(y / self.speed)
+
+    def update_tick(self, time, map_data):
+
+        self.check_collision(time, map_data)
+        dt = time - self.time
         self.time = time
-        self.motion_x = self.speed * math.sin(self.rotation)
-        self.motion_y = self.speed * math.cos(self.rotation)
         self.pos_x += dt * self.motion_x
         self.pos_y += dt * self.motion_y
+        self.speed *= 1 - dt
         # self.speed = (1 if self.speed > 0 else -1) * math.sqrt(self.motion_x ** 2 + self.motion_y ** 2)
         if self.speed != 0:
             self.rotation = self.rotation % (2 * math.pi)
@@ -180,92 +95,114 @@ class PlayerData:
     def check_collision(self, time, map_data):
         """
         撞！
+        map_data为函数指针，传入一个表示横坐标和一个纵坐标的tuple，返回一个表示墙面高度和角度的tuple
         """
-        # FIXME：
-        # 我希望的地图格式：一个列表[*,*,*,...,*]，
-        # 奇数位置上的*相当于各个像素点处的is_wall变量，
-        # 其排布为从左上角像素开始，每过一个*，相应的像素点向右平移一格，
-        # 直到右边界处“换行”到下一行，到右下角像素为止；
-        # 奇数位*后面紧跟着的*是奇数位*对应的像素点处的墙（如果有）的方向角，
-        # 角度制表示，水平向右为角度零点，逆时针方向上角度增加...你应该看懂了吧...看不懂qq问我
-        dt = self.time - time
-        self.is_wall = map_data[
-            2 * (self.pos_y * WINDOWWIDTH + self.pos_x)]  # FIXME：->_->为便于修改，这里定义了两个变量作控制变量，wzb你给不出我希望的地图格式的话，可以修改这里
-        self.wall_angle = map_data[2 * (self.pos_y * WINDOWWIDTH + self.pos_x) + 1]
-        if self.pos_x * self.pos_y == 0 or (WINDOWWIDTH - 1 - self.pos_x) * (
-                        WINDOWHEIGHT - 1 - self.pos_y) == 0:  # 这里是外边界处的碰撞判断
-            if self.pos_x == 0:  # 这些应该能懂，不懂参见下面...
-                self.motion_x = 0
-                self.motion_y *= 0.5
-            elif self.pos_y == 0:
-                self.motion_y = 0
-                self.motion_x *= 0.5
-            elif self.pos_x == WINDOWWIDTH - 1:
-                self.motion_x = 0
-                self.motion_y *= 0.5
-            elif self.pos_y == WINDOWHEIGHT - 1:
-                self.motion_y = 0
-                self.motion_x *= 0.5
-        else:  # 这里是其它位置的碰撞判断
-            if self.is_wall == 1:
-                self.motion_x *= math.cos(self.wall_angle) / 2  # 碰撞导致减速，1/2的目的是使碰撞削减速度（防止碰撞的惩罚措施）
-                self.motion_y *= math.sin(self.wall_angle) / 2
-        self.speed = (1 if self.speed > 0 else -1) * math.sqrt(self.motion_x ** 2 + self.motion_y ** 2)
-        self.pos_x = dt * self.motion_x  # 碰撞导致漂移
-        self.pos_y = dt * self.motion_y
+        dt = time - self.time
+        # FIXME：->_->为便于修改，这里定义了两个变量作控制变量，wzb你给不出我希望的地图格式的话，可以修改这里
+        # by ustc-zzzz: 你放个函数指针进去会shi啊->_->
+        wall_height = map_data.wall((self.pos_x, self.pos_y))
+        wall_height_x, wall_height_y = wall_height
+        # 这里是外边界处的碰撞判断
+        width, height =  map_data.size()
+        motion_x, motion_y = self.motion_x, self.motion_y
+        if self.pos_x <= 0 and motion_x < 0:  # 这些应该能懂，不懂参见下面...
+            self.motion_x *= 0
+        elif self.pos_x >= width - 1 and motion_x > 0:
+            self.motion_x *= 0
+        if self.pos_y <= 0 and motion_y < 0:
+            self.motion_y *= 0
+        elif self.pos_y >= height - 1 and motion_y > 0:
+            self.motion_y *= 0
+        # 这里是其它位置的碰撞判断
+        # 碰撞导致减速，1/2的目的是使碰撞削减速度（防止碰撞的惩罚措施）
+        self.motion_x -= wall_height_x * dt * 32
+        self.motion_y -= wall_height_y * dt * 32
+        # 没必要，下一tick会自动处理
+        # self.speed = (1 if self.speed > 0 else -1) * math.sqrt(self.motion_x ** 2 + self.motion_y ** 2)
+        # self.pos_x = dt * self.motion_x  # 碰撞导致漂移
+        # self.pos_y = dt * self.motion_y
+
+class MapData:
+
+    def __init__(self, width, height, map_func):
+        self._width = width
+        self._height = height
+        self._func = map_func
+
+    def size(self):
+        return (self._width, self._height)
+
+    def wall(self, pos):
+        x, y = pos
+        return self._func(x, y)
+
+    @staticmethod
+    def get_map_data(map_image):
+        width, height = map_image.get_size()
+
+        def map_func(x, y):
+            def gray_scale(color):
+                return 0.2989 * color.r + 0.5870 * color.g + 0.1140 * color.b
+
+            def check_range(number, bound):
+                return min(max(number, 0), bound - 1)
+
+            pos_x, pos_y = round(x), round(y)
+            pixel_top_right = gray_scale(map_image.get_at((check_range(pos_x, width), check_range(pos_y - 1, height))))
+            pixel_top_left = gray_scale(map_image.get_at((check_range(pos_x - 1, width), check_range(pos_y - 1, height))))
+            pixel_bottom_left = gray_scale(map_image.get_at((check_range(pos_x - 1, width), check_range(pos_y, height))))
+            pixel_bottom_right = gray_scale(map_image.get_at((check_range(pos_x, width), check_range(pos_y, height))))
+            diff_x = (pixel_top_left + pixel_bottom_left - pixel_top_right - pixel_bottom_right)
+            diff_y = (pixel_top_left + pixel_top_right - pixel_bottom_left - pixel_bottom_right)
+            return diff_x, diff_y
+
+        return MapData(width, height, map_func)
 
 
 class Display:
-    def __init__(self, startTime, getData, thePlayerData, upDown, upUp, downDown, downUp,
-                 leftDown, leftUp, rightDown, rightUp, game_server):
+    def __init__(self, start_time, key_binding, game_server):
         """
         产生一个display对象
 
         参数：
-            startTime 游戏时间为0时的UNIX时间戳
-            getData   返回值为[(昵称, 游戏时间, 赛车X, 赛车X速度, 赛车Y, 赛车Y速度, 赛车方向), ...]的函数
-            upDown    方向键“上”被按下时的处理函数
+            start_time      游戏时间为0时的UNIX时间戳
+            on_key_down     方向键被按下时的处理函数
             ...       ...
         """
-        self.startTime = startTime
-        self.getData = getData
-        self.thePlayerData = thePlayerData
-        self.onKeyDown = {K_UP: upDown, K_DOWN: downDown, K_LEFT: leftDown, K_RIGHT: rightDown}
-        self.onKeyUp = {K_UP: upUp, K_DOWN: downUp, K_LEFT: leftUp, K_RIGHT: rightUp}
+        self.startTime = start_time
+        self.key_binding = key_binding
         self.surf = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
         self.game_server = game_server
         self.last_tick = time.time() - self.startTime
         self.running = True
         self.state_changed = True
+        self.theme_index = 0
         self.theme = "normal"
 
-        self.map_width = 0
-        self.map_height = 0
+        self.map_data_image = pygame.image.load('map_data.png')
+        self.map_width = self.map_data_image.get_width()
+        self.map_height = self.map_data_image.get_height()
+        self.map_data = MapData.get_map_data(self.map_data_image)
 
-    def handle_key(self):
+        self.player_data = [PlayerData("Player" + str(random.randrange(1000, 10000))), PlayerData('玩家2')]
+        self.current_player = self.player_data[0]
+
+    def handle_key(self, time):
         """
         响应键盘事件
         """
-        self.state_changed = False
         for event in pygame.event.get():
-            if event.type == KEYUP:
-                if event.key in self.onKeyUp:
-                    self.onKeyUp[event.key]()
-                if event.key == K_ESCAPE:
-                    self.stop()
-            if event.type == KEYDOWN:
-                if event.key in self.onKeyDown:
-                    self.onKeyDown[event.key]()
-            self.state_changed = True
+            if event.type == KEYUP and event.key == K_ESCAPE: self.stop()
+        self.state_changed = self.key_binding.update(lambda key: pygame.key.get_pressed()[key], time, self)
 
     def send_changes(self):
         if self.state_changed:
-            packed = struct.pack('3f', self.thePlayerData.time, self.thePlayerData.speed, self.thePlayerData.rotation)
+            packed = struct.pack('3f', self.current_player.time, self.current_player.speed, self.current_player.rotation)
             self.game_server.send_packet("C:" + str(base64.b64encode(packed), "utf-8"))
 
     def calculate_offset(self, pos_x, pos_y):
-        x = min(max(WINMIDX - self.thePlayerData.pos_x, WINDOWWIDTH - self.map_width), 0) + pos_x
-        y = min(max(WINMIDY - self.thePlayerData.pos_y, WINDOWHEIGHT - self.map_height), 0) + pos_y
+        x = min(max(WINMIDX - self.current_player.pos_x, WINDOWWIDTH - self.map_width), 0) + pos_x
+        y = min(max(WINMIDY - self.current_player.pos_y, WINDOWHEIGHT - self.map_height), 0) + pos_y
         return (x, y)
 
     def draw_map(self, player_data):
@@ -274,7 +211,6 @@ class Display:
         """
         mapImage = pygame.image.load(self.theme + '/map.png').convert(32, SRCALPHA)
         mapRect = mapImage.get_rect()
-        self.map_width, self.map_height = mapRect[2], mapRect[3]
         mapRect.topleft = self.calculate_offset(0, 0)
         self.surf.blit(mapImage, mapRect)
 
@@ -282,9 +218,9 @@ class Display:
         """
         快上车
         """
-        carImagePath = self.theme + ('/mycar.png' if player_data.name is self.thePlayerData.name else "/car.png")
+        carImagePath = self.theme + ('/mycar.png' if player_data.name is self.current_player.name else "/car.png")
         carImage = pygame.image.load(carImagePath).convert(32, SRCALPHA)
-        rotatedCar = pygame.transform.rotate(carImage, player_data.rotation * 180 / math.pi)
+        rotatedCar = pygame.transform.rotate(carImage, -player_data.rotation * 180 / math.pi)
         carRect = rotatedCar.get_rect()
         carRect.center = self.calculate_offset(player_data.pos_x, player_data.pos_y)
         self.surf.blit(rotatedCar, carRect)
@@ -307,30 +243,30 @@ class Display:
         """
         所有的车
         """
-        for player_data in self.getData():
-            if (player_data.name != self.thePlayerData.name):
+        for player_data in self.player_data:
+            if (player_data.name != self.current_player.name):
                 self.draw_car(player_data)
-        self.draw_car(self.thePlayerData)
+        self.draw_car(self.current_player)
 
     def tick_player(self, t):
         """
         玩家逻辑
         """
-        for player_data in self.getData():
-            player_data.update_tick(t)
+        for player_data in self.player_data:
+            player_data.update_tick(t, self.map_data)
 
     def tick(self, t):
         """
         Game loop
         """
         # key events
-        self.handle_key()
+        self.handle_key(t)
         # tick player
         self.tick_player(t)
         self.send_changes()
         # draw
-        self.draw_map(self.thePlayerData)
-        self.draw_building(self.thePlayerData)
+        self.draw_map(self.current_player)
+        self.draw_building(self.current_player)
         self.draw_cars()
         # update
         pygame.display.update()
@@ -345,7 +281,7 @@ class Display:
         pygame.init()
         clock = pygame.time.Clock()
         pygame.display.set_caption('Ice Mud Game')
-        self.game_server.send_packet('L:' + self.thePlayerData.name)
+        self.game_server.send_packet('L:' + self.current_player.name)
         self.send_changes()
         while self.running:
             self.tick(time.time() - self.startTime)
@@ -372,7 +308,7 @@ class Display:
                     pos_x, pos_y, player.speed, player.rotation, player.time = struct.unpack('5f', packed)
                     player.pos_x = pos_x
                     player.pos_y = pos_y
-                    player.update_tick(self.last_tick)
+                    player.update_tick(self.last_tick, self.map_data)
                     data_dict.pop(player.name)
                 else:
                     data.remove(player)
@@ -381,40 +317,62 @@ class Display:
                 pos_x, pos_y, player.speed, player.rotation, player.time = struct.unpack('5f', base64.b64decode(packed))
                 player.pos_x = pos_x
                 player.pos_y = pos_y
-                player.update_tick(self.last_tick)
+                player.update_tick(self.last_tick, self.map_data)
                 data_dict.pop(player.name)
         except:
             pass
 
+class KeyBinding:
 
-def nop():
-    pass
+    def __init__(self):
+        self.counter = 3
+        self.themes = ["normal", "simple", "excited"]
+        self.theme_changed = True
+
+    def update(self, is_key_pressed, time, display):
+        if (is_key_pressed(K_e)):
+            if self.theme_changed:
+                display.theme_index = (display.theme_index + 1) % len(self.themes)
+                display.theme = self.themes[display.theme_index]
+                self.theme_changed = False
+        elif not self.theme_changed:
+            self.theme_changed = True
+        flag = False
+        if (is_key_pressed(K_UP)):
+            self.up(display, time)
+            flag = True
+        if (is_key_pressed(K_DOWN)):
+            self.down(display, time)
+            flag = True
+        if (is_key_pressed(K_LEFT)):
+            self.left(display, time)
+            flag = True
+        if (is_key_pressed(K_RIGHT)):
+            self.right(display, time)
+            flag = True
+        if self.counter >= 3:
+            self.counter = 0
+            return flag
+        else:
+            self.counter += 1
+            return False
 
 
-player_data = [PlayerData("Player" + str(random.randrange(1000, 10000))), PlayerData('玩家2')]
-
-current_player = player_data[0]
-
-
-def get_data():
-    return player_data
+    def up(self, display, time):
+        display.current_player.speed += (time - display.last_tick) * ((2048 - display.current_player.speed) / 16 + 64 * random.random())
 
 
-def up():
-    current_player.speed += 50 + 5 * random.random()
+    def down(self, display, time):
+        display.current_player.speed -= (time - display.last_tick) * ((2048 + display.current_player.speed) / 16 + 64 * random.random())
 
 
-def down():
-    current_player.speed -= 50 + 5 * random.random()
+    def left(self, display, time):
+        display.current_player.rotation -= (time - display.last_tick) * 0.5
 
 
-def left():
-    current_player.rotation += 0.1
-
-
-def right():
-    current_player.rotation -= 0.1
+    def right(self, display, time):
+        display.current_player.rotation += (time - display.last_tick) * 0.5
 
 
 def dummy_display(game_server):
-    return Display(time.time() - 4, get_data, current_player, up, nop, down, nop, left, nop, right, nop, game_server)
+    return Display(time.time() - 4, KeyBinding(), game_server)

@@ -7,6 +7,8 @@ import base64
 import struct
 import time
 import game
+import pygame
+import math
 
 
 class GameServer:
@@ -22,6 +24,11 @@ class GameServer:
             Client: receive_message
     Server ------------------------> Client
     """
+
+    class PlayerDataServer(game.PlayerData):
+        def __init__(self, name, client_address):
+            self.client_address = client_address
+            super().__init__(name)
 
     class ServerPacketLogout:
         @staticmethod
@@ -52,13 +59,13 @@ class GameServer:
             if name in game_server.map.players:
                 return ''
             else:
-                game_server.map.player_data[client_address] = PlayerDataServer(name, client_address)
+                game_server.map.player_data[client_address] = GameServer.PlayerDataServer(name, client_address)
                 game_server.map.players.append(name)
                 return str(game_server.map.start_time)
 
-    def __init__(self):
-        self.host = "127.0.0.1"
-        self.port = 23344
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
         self.map = RaceMap(self)
         self.packet_types = {'L': self.ServerPacketLogin,
                              'C': self.ServerPacketControl,
@@ -87,28 +94,22 @@ class GameServer:
 
         def handle(self):
             while self.game_server.map.running:
-                message = str(self.rfile.readline().strip(), "utf-8")
-
-                print("(Client)", repr(self.client_address), message)
-
                 try:
+                    message = str(self.rfile.readline().strip(), "utf-8")
+
+                    print("(Client)", repr(self.client_address), message)
+
                     packet_handler = self.game_server.packet_types[message[0]]
                     new_message = packet_handler.handle_message(message[2::], self.client_address, self.game_server)
+
+                    if (new_message is None) or (len(new_message) < 2):
+                        break
+                    else:
+                        print("(Server)", repr(self.server.server_address), message[0] + message[1] + new_message)
+                        self.wfile.write(bytes(message[0] + message[1] + new_message + '\n', "utf-8"))
                 except:
-                    pass
-
-                if new_message is None:
                     break
-                else:
-                    print("(Server)", repr(self.server.server_address), message[0] + message[1] + new_message)
-                    self.wfile.write(bytes(message[0] + message[1] + new_message + '\n', "utf-8"))
             print("(Closed)", self.client_address)
-
-
-class PlayerDataServer(game.PlayerData):
-    def __init__(self, name, client_address):
-        self.client_address = client_address
-        super().__init__(name)
 
 
 class RaceMap:
@@ -119,7 +120,7 @@ class RaceMap:
         self.start_time = time.time() - 4
         self.running = True
         self.game_started = False
-        self.map_data = []
+        self.map_data = game.MapData.get_map_data(pygame.image.load('map_data.png'))
 
     def write_player_data(self, data):
         message = ''
@@ -137,12 +138,7 @@ class RaceMap:
         玩家逻辑
         """
         for player_data in self.player_data.values():
-            player_data.update_tick(t)
-            # player_data.check_collision(t) #碰撞判断
-
-    def get_map_data(self, map_data):  # 这个函数在game.py 里调用
-        # TODO：->_->讲道理我现在不知道怎么拿到map，我希望的map格式在game.py里有写
-        pass
+            player_data.update_tick(t, self.map_data)
 
     def handle_key(self):
         pass
@@ -178,4 +174,4 @@ class RaceMap:
 
 
 if __name__ == "__main__":
-    GameServer().run()
+    GameServer("127.0.0.1", 23345).run()

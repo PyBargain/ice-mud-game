@@ -28,16 +28,16 @@ class GameClient:
     class ClientPacketControl:
         @staticmethod
         def receive_message(request_message, client_address, game_client):
-            game_client.display.read_player_data(game_client.display.getData(), request_message)
+            game_client.display.read_player_data(game_client.display.player_data, request_message)
 
     class ClientPacketLogin:
         @staticmethod
         def receive_message(request_message, server_address, game_client):
             game_client.display.startTime = float(request_message)
 
-    def __init__(self):
-        self.host = "127.0.0.1"
-        self.port = 23344
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
 
     def send_packet(self, message):
         print("(Client)", self.socket.getsockname(), message)
@@ -76,4 +76,4 @@ class GameClient:
 
 
 if __name__ == "__main__":
-    GameClient().run()
+    GameClient("127.0.0.1", 23345).run()
