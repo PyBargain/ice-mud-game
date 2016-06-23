@@ -91,15 +91,13 @@ class Display:
 
         参数：
             start_time      游戏时间为0时的UNIX时间戳
-            on_key_down     方向键被按下时的处理函数
-            ...       ...
         """
         self.start_time = start_time
         self.key_binding = key_binding
 
         pygame.init()
-        pygame.display.set_caption('Ice Mud Game')
         self.surf = pygame.display.set_mode((Constants.WINDOW_WIDTH, Constants.WINDOW_HEIGHT))
+        pygame.display.set_caption('Ice Mud Game')
         self.game_server = game_server
         self.last_tick = time.time() - self.start_time
         self.running = True
