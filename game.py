@@ -72,7 +72,6 @@ class PlayerData:
         self.time = time
         self.pos_x += dt * self.motion_x
         self.pos_y += dt * self.motion_y
-        self.speed *= 1 - dt
         # self.speed = (1 if self.speed > 0 else -1) * math.sqrt(self.motion_x ** 2 + self.motion_y ** 2)
         if self.speed != 0:
             self.rotation = self.rotation % (2 * math.pi)
@@ -100,12 +99,10 @@ class PlayerData:
             self.motion_y *= 0
         # 这里是其它位置的碰撞判断
         # 碰撞导致减速，1/2的目的是使碰撞削减速度（防止碰撞的惩罚措施）
+        self.pos_x -= dt * self.motion_x * (wall_height_x / 256) ** 2 / 4  # 碰撞导致漂移
+        self.pos_y -= dt * self.motion_y * (wall_height_y / 256) ** 2 / 4
         self.motion_x -= wall_height_x * dt * 32
         self.motion_y -= wall_height_y * dt * 32
-        # 没必要，下一tick会自动处理
-        # self.speed = (1 if self.speed > 0 else -1) * math.sqrt(self.motion_x ** 2 + self.motion_y ** 2)
-        # self.pos_x = dt * self.motion_x  # 碰撞导致漂移
-        # self.pos_y = dt * self.motion_y
 
 
 class MapData:

@@ -96,6 +96,9 @@ class Display:
         """
         self.start_time = start_time
         self.key_binding = key_binding
+
+        pygame.init()
+        pygame.display.set_caption('Ice Mud Game')
         self.surf = pygame.display.set_mode((Constants.WINDOW_WIDTH, Constants.WINDOW_HEIGHT))
         self.game_server = game_server
         self.last_tick = time.time() - self.start_time
@@ -207,9 +210,7 @@ class Display:
 
         此函数直到stop被调用后才会返回
         """
-        pygame.init()
         clock = pygame.time.Clock()
-        pygame.display.set_caption('Ice Mud Game')
         self.game_server.send_packet('L:' + self.current_player.name)
         self.send_changes()
         while self.running:
@@ -223,6 +224,7 @@ class Display:
         """
         self.game_server.send_packet('E:')
         self.running = False
+        self.game_server.socket.close()
 
     def read_player_data(self, data, message):
         try:
@@ -309,4 +311,4 @@ class KeyBinding:
 
 
 if __name__ == "__main__":
-    GameClient("127.0.0.1", 23344).run()
+    GameClient("127.0.0.1", 23345).run()

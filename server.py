@@ -1,7 +1,8 @@
 #! /usr/bin/python3
 # coding=utf-8
 
-import socketserver
+import socket
+import asyncore
 import threading
 import base64
 import struct
@@ -10,7 +11,8 @@ import pygame
 
 from game import *
 
-class GameServer:
+
+class GameServer(asyncore.dispatcher):
     """
     Three Steps:
 
@@ -23,7 +25,6 @@ class GameServer:
             Client: receive_message
     Server ------------------------> Client
     """
-
     class PlayerDataServer(PlayerData):
         def __init__(self, name, client_address):
             self.client_address = client_address
@@ -35,7 +36,8 @@ class GameServer:
             if client_address in game_server.map.player_data.keys():
                 game_server.map.players.remove(game_server.map.player_data[client_address].name)
                 game_server.map.player_data.pop(client_address)
-            return None
+                game_server.remove_client(client_address)
+            return []
 
     class ServerPacketControl:
         @staticmethod
@@ -47,74 +49,87 @@ class GameServer:
                 player_data.time = timestamp
                 player_data.speed = speed
                 player_data.rotation = rotation
-                return game_server.map.write_player_data(game_server.map.player_data)
+                return [game_server.map.write_player_data(game_server.map.player_data)]
             else:
-                return None
+                return []
 
     class ServerPacketLogin:
         @staticmethod
         def handle_message(request_message, client_address, game_server):
             name = request_message[:16:]
             if name in game_server.map.players:
-                return ''
+                return ['']
             else:
                 game_server.map.player_data[client_address] = GameServer.PlayerDataServer(name, client_address)
                 game_server.map.players.append(name)
-                return str(game_server.map.start_time)
+                return [str(game_server.map.start_time)]
+
+    class RemoteClient(asyncore.dispatcher):
+
+        def __init__(self, host, socket, address):
+            asyncore.dispatcher.__init__(self, socket)
+            self.host = host
+            self.address = address
+            self.outbox = []
+
+        def say(self, message):
+            self.outbox.append(message)
+
+        def handle_read(self):
+            client_message = self.recv(1024).strip()
+            self.host.broadcast(client_message, self.address)
+
+        def handle_write(self):
+            for message in self.outbox: self.send(message)
+            self.outbox.clear()
 
     def __init__(self, host, port):
-        self.host = host
-        self.port = port
+        asyncore.dispatcher.__init__(self)
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.address = (host, port)
+        self.bind(self.address)
+        self.listen(1)
+        self.remote_clients = {}
         self.map = RaceMap(self)
+        self.network_loop = threading.Thread(target = (lambda: asyncore.loop(timeout = 3)))
         self.packet_types = {'L': self.ServerPacketLogin,
                              'C': self.ServerPacketControl,
                              'E': self.ServerPacketLogout}
-        self.socket = None
-
-    def create_handler(self, request, client_address, server):
-        return GameServer.Handler(request, client_address, server, self)
 
     def run(self):
-        self.socket = socketserver.ThreadingTCPServer((self.host, self.port), self.create_handler)
         print("Starting server... ")
-        threading.Thread(target=self.socket.serve_forever).start()
+        self.network_loop.start()
         self.map.run()
         print("Stopping server... ")
-        self.socket.shutdown()
+        self.close()
+        self.network_loop.join()
 
-    def stop(self):
-        self.socket.shutdown()
+    def remove_client(self, address):
+        if address in self.remote_clients.keys():
+            print("(Closed)", address)
+            self.remote_clients.pop(address).close()
 
-    class Handler(socketserver.StreamRequestHandler):
+    def handle_accept(self):
+        socket, address = self.accept()
+        self.remote_clients[address] = self.RemoteClient(self, socket, address)
 
-        def __init__(self, request, client_address, server, game_server):
-            self.game_server = game_server
-            super().__init__(request, client_address, server)
-
-        def handle(self):
-            while self.game_server.map.running:
-                try:
-                    message = str(self.rfile.readline().strip(), "utf-8")
-
-                    print("(Client)", repr(self.client_address), message)
-
-                    packet_handler = self.game_server.packet_types[message[0]]
-                    new_message = packet_handler.handle_message(message[2::], self.client_address, self.game_server)
-
-                    if (new_message is None) or (len(new_message) < 2):
-                        break
-                    else:
-                        print("(Server)", repr(self.server.server_address), message[0] + message[1] + new_message)
-                        self.wfile.write(bytes(message[0] + message[1] + new_message + '\n', "utf-8"))
-                except:
-                    break
-            print("(Closed)", self.client_address)
+    def broadcast(self, message, address):
+        client_message = str(message, "utf-8")
+        print("(Client)", repr(address), client_message)
+        packet_handler = self.packet_types[client_message[0]]
+        new_messages = packet_handler.handle_message(client_message[2::], address, self)
+        for new_message in new_messages:
+            server_message = client_message[0] + client_message[1] + new_message
+            print("(Server)", repr(self.address), server_message)
+            for remote_client in self.remote_clients.values():
+                remote_client.say(bytes(server_message + '\n', "utf-8"))
 
 
 class RaceMap:
     """
     负责服务端逻辑
     """
+
     def __init__(self, game_server):
         self.player_data = {}
         self.players = []
@@ -176,4 +191,4 @@ class RaceMap:
 
 
 if __name__ == "__main__":
-    GameServer("127.0.0.1", 23344).run()
+    GameServer("127.0.0.1", 23345).run()
