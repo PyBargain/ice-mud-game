@@ -18,6 +18,7 @@ class Player:
         self.vx = 0
         self.vy = 0
         self.d = 0
+        self.isPayed = False
 
     def tick(self, t):
         dt = t - self.t

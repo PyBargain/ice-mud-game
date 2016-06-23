@@ -11,13 +11,17 @@ import pygame
 from pygame.locals import *
 
 
-WINDOWWIDTH = 640
-WINDOWHEIGHT = 480
+WINDOWWIDTH = 1280
+WINDOWHEIGHT = 720
 WINMIDX = WINDOWWIDTH / 2
 WINMIDY = WINDOWHEIGHT / 2
 NAMECOLOR = (255, 255, 255)
 NAMEBG = (64, 64, 64)
 FPS = 30
+
+
+INPUT_KEYS = {K_BACKSPACE, K_RETURN}
+CHAR_KEYS = list(range(ord('0'), ord('9')+1)) + list(range(ord('a'), ord('z')+1)) + [K_SPACE]
 
 
 class Display:
@@ -45,6 +49,7 @@ class Display:
 
         此函数直到stop被调用后才会返回
         '''
+        global c_socket
         pygame.init()
         clock = pygame.time.Clock()
         surf = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
@@ -54,6 +59,95 @@ class Display:
         mapRect = mapImage.get_rect()
         carImage = pygame.image.load('car.png').convert(32, SRCALPHA)
         pygame.display.set_caption('Ice Mud Game')
+        # title1
+        img = pygame.image.load('title1.png')
+        imgrect = img.get_rect()
+        name = ''
+        inputing = True
+        while self.running and inputing:
+            for event in pygame.event.get():
+                if event.type == KEYUP:
+                    if event.key in CHAR_KEYS:
+                        name += chr(event.key)
+                    elif event.key == K_BACKSPACE:
+                        if name:
+                            name = name[:-1]
+                    elif event.key == K_RETURN:
+                        inputing = False
+                    elif event.key == K_ESCAPE:
+                        self.stop()
+            surf.blit(img, imgrect)
+            text = font.render(name, True, (0, 0, 0))
+            rect = text.get_rect()
+            rect.bottomleft = (597, 535)
+            surf.blit(text, rect)
+            pygame.display.update()
+            clock.tick(FPS)
+        # title2
+        img = pygame.image.load('title2.png')
+        imgrect = img.get_rect()
+        key = ''
+        inputing = True
+        while self.running and inputing:
+            for event in pygame.event.get():
+                if event.type == KEYUP:
+                    if event.key in CHAR_KEYS:
+                        key += chr(event.key)
+                    elif event.key == K_BACKSPACE:
+                        if key:
+                            key = key[:-1]
+                    elif event.key == K_RETURN:
+                        inputing = False
+                    elif event.key == K_ESCAPE:
+                        self.stop()
+            surf.blit(img, imgrect)
+            text = font.render('*'*len(key), True, (0, 0, 0))
+            rect = text.get_rect()
+            rect.bottomleft = (597, 569)
+            surf.blit(text, rect)
+            pygame.display.update()
+            clock.tick(FPS)
+        # title3
+        c_socket = socket()
+        self.c_socket = c_socket
+        c_socket.connect(('127.0.0.1', 10667))
+        c_socket.send(b'N'+name.encode()+b'\n')
+        c_socket.send(b'S'+key.encode()+b'\n')
+        img = pygame.image.load('title3.png')
+        imgrect = img.get_rect()
+        name = ''
+        inputing = True
+        player_count = 0
+        while self.running and inputing:
+            for event in pygame.event.get():
+                if event.type == KEYUP:
+                    if event.key == K_ESCAPE:
+                        self.stop()
+            if select([c_socket], [], [], 0)[0]:
+                s = b''
+                while True:
+                    s += c_socket.recv(1)
+                    if s[-1] == ord('\n'):
+                        break
+                s = s.decode()
+                if s[0] == 'T':
+                    self.startTime = eval(s[1:])
+                elif s[0] == 'C':
+                    player_count = eval(s[1:])
+                elif s[0] == '[':
+                    inputing = False
+            surf.blit(img, imgrect)
+            text = font.render(str(int(self.startTime - 5 - time.time())), True, (0, 0, 0))
+            rect = text.get_rect()
+            rect.center = (817, 404)
+            surf.blit(text, rect)
+            text = font.render(str(player_count), True, (0, 0, 0))
+            rect = text.get_rect()
+            rect.midleft = (705, 463)
+            surf.blit(text, rect)
+            pygame.display.update()
+            clock.tick(FPS)
+        # 正式运行
         while self.running:
             t = time.time() - self.startTime
             for event in pygame.event.get():
@@ -116,17 +210,9 @@ def gd():
             if s[-1] == ord('\n'):
                 break
         l = eval(s.decode())
+    print(repr(l))
     return l
 
-'''
-def update():
-    t = time.time() - display.startTime
-    for i in l:
-        dt = t - i[1]
-        i[2] += i[3] * dt
-        i[4] += i[5] * dt
-        i[1] = t
-'''
 
 def upd():
     c_socket.send(b'KU\n')
@@ -151,10 +237,6 @@ def rightd():
 
 def rightu():
     c_socket.send(b'Kr\n')
-
-
-c_socket = socket()
-c_socket.connect(('127.0.0.1', 10667))
 
 
 display = Display(time.time() + 4, gd, upd, upu, downd, downu, leftd, leftu, rightd, rightu)
