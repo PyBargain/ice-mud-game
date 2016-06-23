@@ -13,32 +13,36 @@ class Player:
         self.kRight = False
         self.name = 'Player'
         self.t = 0
-        self.x = 200
-        self.y = 200
+        self.x = 668
+        self.y = 963
         self.vx = 0
         self.vy = 0
         self.d = 0
         self.isPayed = False
+        self.stage = 0
 
     def tick(self, t):
         dt = t - self.t
         self.x += self.vx * 60 * dt
         self.y += self.vy * 60 * dt
         self.side = self.vx * math.cos(math.radians(self.d)) - self.vy * math.sin(math.radians(self.d))
-        self.vx -= self.side * math.cos(math.radians(self.d)) / 4
-        self.vy += self.side * math.sin(math.radians(self.d)) / 4
+        self.vx -= self.side * math.cos(math.radians(self.d)) / 1
+        self.vy += self.side * math.sin(math.radians(self.d)) / 1
         if self.kUp:
             self.vx -= dt * math.sin(math.radians(self.d))
             self.vy -= dt * math.cos(math.radians(self.d))
-            print(repr((self.vx, self.vy)))
         if self.kDown:
             self.vx += dt * math.sin(math.radians(self.d))
             self.vy += dt * math.cos(math.radians(self.d))
         if self.kLeft:
-            self.d += dt * 30
+            self.d += dt * 60
         if self.kRight:
-            self.d -= dt * 30
+            self.d -= dt * 60
         self.t = t
+        if self.stage == 0 and self.x > 1500:
+            self.stage = 1
+        if self.stage == 1 and self.x < 1000 and self.y <= 991 and self.y >= 935:
+            self.stage = 2
 
     def keyEvent(self, k):
         if k == 'U': self.kUp = True
@@ -82,9 +86,9 @@ class MapData:
                 return gray_scale(map_image.get_at((check_range(pos_x, width), check_range(pos_y, height))))
 
             pos_x, pos_y = round(x), round(y)
-            pixel_top_right = get_gray_scale(pos_x, pos_y - 1)
-            pixel_top_left = get_gray_scale(pos_x - 1, pos_y - 1)
-            pixel_bottom_left = get_gray_scale(pos_x - 1, pos_y)
+            pixel_top_right = get_gray_scale(pos_x, pos_y - 50)
+            pixel_top_left = get_gray_scale(pos_x - 50, pos_y - 50)
+            pixel_bottom_left = get_gray_scale(pos_x - 50, pos_y)
             pixel_bottom_right = get_gray_scale(pos_x, pos_y)
             diff_x = (pixel_top_left + pixel_bottom_left - pixel_top_right - pixel_bottom_right)
             diff_y = (pixel_top_left + pixel_top_right - pixel_bottom_left - pixel_bottom_right)
@@ -93,11 +97,32 @@ class MapData:
         return MapData(width, height, map_func)
 
 
+TABLE = { # ul   dl     ur      dr      x   y
+        (False, False, False, False): ( 0,  0),
+        (False, False, False, True ): ( 1,  1),
+        (False, False, True , False): ( 1, -1),
+        (False, False, True , True ): ( 1,  0),
+        (False, True , False, False): (-1,  1),
+        (False, True , False, True ): ( 0,  1),
+        (False, True , True , False): ( 0,  0),
+        (False, True , True , True ): ( 1,  1),
+        (True , False, False, False): (-1, -1),
+        (True , False, False, True ): ( 0,  0),
+        (True , False, True , False): ( 0, -1),
+        (True , False, True , True ): ( 1, -1),
+        (True , True , False, False): (-1,  0),
+        (True , True , False, True ): (-1,  1),
+        (True , True , True , False): (-1, -1),
+        (True , True , True , True ): ( 0,  0)
+}
+
+
 class Game:
     def __init__(self, players, startTime):
         self.players = players
         self.startTime = startTime
-        self.map_data = MapData.get_map_data(pygame.image.load('map_data.png'))
+        self.map_data_image = pygame.image.load('map_data.png')
+        self.map_data = MapData.get_map_data(self.map_data_image)
 
     def tick(self):
         for p in self.players:
@@ -105,35 +130,20 @@ class Game:
             self.checkCollision(p)
 
     def checkCollision(self, player):
-        dt = time.time() - self.startTime
-        wall_height = self.map_data.wall((player.x, player.y))
-        wall_height_x, wall_height_y = wall_height
-        # 这里是外边界处的碰撞判断
-        width, height = self.map_data.size()
-        motion_x, motion_y = player.vx, player.vy
-        # 这些应该能懂，不懂参见下面...
-        '''
-        if player.x <= 0 and motion_x < 0:
-            player.vx = 0
-            player.x = -1
-        elif player.x >= width - 1 and motion_x > 0:
-            player.vx = 0
-            player.x = width
-        if player.y <= 0 and motion_y < 0:
-            player.vy = 0
-            player.y = -1
-        elif player.y >= height - 1 and motion_y > 0:
-            player.vy = 0
-            player.y = height
-        '''
-        # 这里是其它位置的碰撞判断
-        # 碰撞导致减速，1/2的目的是使碰撞削减速度（防止碰撞的惩罚措施）
-        # player.x -= dt * player.vx * (wall_height_x / 256) ** 2  # 碰撞导致漂移
-        # player.y -= dt * player.vy * (wall_height_y / 256) ** 2
-        player.vx *= math.exp(-0.25 * wall_height_x * wall_height_x)
-        player.vy *= math.exp(-0.25 * wall_height_y * wall_height_y)
-        player.x -= 0.25 * wall_height_x
-        player.y -= 0.25 * wall_height_y
+        def get_v(pos):
+            return self.map_data_image.get_at((int(pos[0]), int(pos[1]))).hsva[2] > 50
+        if get_v((player.x, player.y)):
+            return
+        neighbor = tuple(map(get_v, [
+            (player.x-30, player.y-30),
+            (player.x-30, player.y+30),
+            (player.x+30, player.y-30),
+            (player.x+30, player.y+30)]))
+        player.x += TABLE[neighbor][0] * 2
+        player.y += TABLE[neighbor][1] * 2
+        if TABLE[neighbor][0]: player.vx = 0
+        if TABLE[neighbor][1]: player.vy = 0
+        return
 
 
     def getState(self):

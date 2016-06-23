@@ -16,7 +16,7 @@ from pygame.locals import *
 from game import Player, Game
 
 
-TICKET_SHA1SUM = '9dfc9983c4dc37d280f3628815a832a47d3f70c4'
+TICKET_SHA1SUM = '7aa8398d0e80429a3380540b86f08987d0fb3e77'
 
 
 '''
@@ -28,6 +28,7 @@ TICKET_SHA1SUM = '9dfc9983c4dc37d280f3628815a832a47d3f70c4'
     T startTime
     C 当前在线人数
     [ 数据
+    W 赢家信息
 '''
 
 
@@ -43,6 +44,7 @@ class Server:
         stopAcceptTime = self.startTime - 5
         print('收到第一个连接，等待5秒其他玩家')
         self.cs_socket[-1].send(('T%r\n'%self.startTime).encode())
+        self.cs_socket[-1].send(('C%r\n'%len(self.cs_socket)).encode())
         self.s_socket.settimeout(0.01)
         while time.time() < stopAcceptTime:
             try:
@@ -63,6 +65,12 @@ class Server:
         time.sleep(self.startTime - time.time())
         while True:
             self.game.tick()
+            for p in self.players:
+                if p.stage == 2:
+                    winner = p
+                    for c_socket in self.cs_socket:
+                        c_socket.send(('W%s\n'%p.name).encode())
+                    return
             self.checkNet()
             state = repr(self.game.getState()).encode() + b'\n'
             for c_socket in self.cs_socket:
@@ -79,13 +87,14 @@ class Server:
                     break
             s = s.decode()
             if s[0] == 'K':
-                print(repr(s))
                 self.players[self.cs_socket.index(c_socket)].keyEvent(s[1])
             elif s[0] == 'N':
                 self.players[self.cs_socket.index(c_socket)].setName(s[1:-1])
             elif s[0] == 'S':
+                print(repr(s[1:-1].encode()))
                 if sha1(s[1:-1].encode()).hexdigest() == TICKET_SHA1SUM:
                     self.players[self.cs_socket.index(c_socket)].isPayed = True
+                    self.players[self.cs_socket.index(c_socket)].y -= 200
 
 try:
     server = Server(('127.0.0.1', 10667))
