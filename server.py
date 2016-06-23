@@ -40,9 +40,9 @@ class Server:
         self.s_socket.listen(2)
         self.cs_socket = [self.s_socket.accept()[0]]
         self.players = [Player()]
-        self.startTime = time.time() + 10
+        self.startTime = time.time() + 35
         stopAcceptTime = self.startTime - 5
-        print('收到第一个连接，等待5秒其他玩家')
+        print('收到第一个连接，等待30秒其他玩家')
         self.cs_socket[-1].send(('T%r\n'%self.startTime).encode())
         self.cs_socket[-1].send(('C%r\n'%len(self.cs_socket)).encode())
         self.s_socket.settimeout(0.01)
