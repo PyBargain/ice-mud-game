@@ -6,10 +6,9 @@ import threading
 import base64
 import struct
 import time
-import game
 import pygame
-import math
 
+from game import *
 
 class GameServer:
     """
@@ -25,7 +24,7 @@ class GameServer:
     Server ------------------------> Client
     """
 
-    class PlayerDataServer(game.PlayerData):
+    class PlayerDataServer(PlayerData):
         def __init__(self, name, client_address):
             self.client_address = client_address
             super().__init__(name)
@@ -113,6 +112,9 @@ class GameServer:
 
 
 class RaceMap:
+    """
+    负责服务端逻辑
+    """
     def __init__(self, game_server):
         self.player_data = {}
         self.players = []
@@ -120,7 +122,7 @@ class RaceMap:
         self.start_time = time.time() - 4
         self.running = True
         self.game_started = False
-        self.map_data = game.MapData.get_map_data(pygame.image.load('map_data.png'))
+        self.map_data = MapData.get_map_data(pygame.image.load('map_data.png'))
 
     def write_player_data(self, data):
         message = ''
@@ -158,7 +160,7 @@ class RaceMap:
         """
         while self.running:
             self.tick(time.time() - self.start_time)
-            time.sleep((1.0 / game.FPS) - time.time() % (1.0 / game.FPS))
+            time.sleep((1.0 / Constants.FPS) - time.time() % (1.0 / Constants.FPS))
 
     def tick(self, t):
         """
@@ -174,4 +176,4 @@ class RaceMap:
 
 
 if __name__ == "__main__":
-    GameServer("127.0.0.1", 23345).run()
+    GameServer("127.0.0.1", 23344).run()
