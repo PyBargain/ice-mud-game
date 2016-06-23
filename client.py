@@ -8,6 +8,7 @@ import socket
 import threading
 import time
 import pygame
+import select
 
 from game import *
 
@@ -157,8 +158,8 @@ class Display:
         nameSurf = font.render(player_data.name, True, Constants.NAME_COLOR)
         nameRect = nameSurf.get_rect()
         nameRect.center = self.calculate_offset(player_data.pos_x, player_data.pos_y - 48)
-        # FIXME: 这里还有点问题，先去掉
-        # surf.fill(NAMEBG, nameRect)
+        # FIXME: 这里还有点问题，先去掉  还是先开着吧
+        surf.fill(NAMEBG, nameRect)
         self.surf.blit(nameSurf, nameRect)
 
     def draw_building(self, player_data):
@@ -189,6 +190,9 @@ class Display:
         """
         Game loop
         """
+        # check server
+        if select.select([], [], [], 0)[0]:
+            pass
         # key events
         self.handle_key(t)
         # tick player
