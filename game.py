@@ -8,6 +8,7 @@ class PlayerData:
     """
     玩家数据
     """
+
     def __init__(self, name):
         # name
         self.name = name
@@ -72,9 +73,7 @@ class PlayerData:
         self.time = time
         self.pos_x += dt * self.motion_x
         self.pos_y += dt * self.motion_y
-        # self.speed = (1 if self.speed > 0 else -1) * math.sqrt(self.motion_x ** 2 + self.motion_y ** 2)
-        if self.speed != 0:
-            self.rotation = self.rotation % (2 * math.pi)
+        if self.speed != 0: self.rotation = self.rotation % (2 * math.pi)
 
     def check_collision(self, time, map_data):
         """
@@ -124,18 +123,20 @@ class MapData:
 
         def map_func(x, y):
             def gray_scale(color):
-                return 0.2989 * color.r + 0.5870 * color.g + 0.1140 * color.b
+                h, s, v, a = color.hsva
+                return v * 2.56
 
             def check_range(number, bound):
                 return min(max(number, 0), bound - 1)
 
+            def get_gray_scale(pos_x, pos_y):
+                return gray_scale(map_image.get_at((check_range(pos_x, width), check_range(pos_y, height))))
+
             pos_x, pos_y = round(x), round(y)
-            pixel_top_right = gray_scale(map_image.get_at((check_range(pos_x, width), check_range(pos_y - 1, height))))
-            pixel_top_left = gray_scale(
-                map_image.get_at((check_range(pos_x - 1, width), check_range(pos_y - 1, height))))
-            pixel_bottom_left = gray_scale(
-                map_image.get_at((check_range(pos_x - 1, width), check_range(pos_y, height))))
-            pixel_bottom_right = gray_scale(map_image.get_at((check_range(pos_x, width), check_range(pos_y, height))))
+            pixel_top_right = get_gray_scale(pos_x, pos_y - 1)
+            pixel_top_left = get_gray_scale(pos_x - 1, pos_y - 1)
+            pixel_bottom_left = get_gray_scale(pos_x - 1, pos_y)
+            pixel_bottom_right = get_gray_scale(pos_x, pos_y)
             diff_x = (pixel_top_left + pixel_bottom_left - pixel_top_right - pixel_bottom_right)
             diff_y = (pixel_top_left + pixel_top_right - pixel_bottom_left - pixel_bottom_right)
             return diff_x, diff_y
