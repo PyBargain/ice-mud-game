@@ -42,6 +42,7 @@ class Display:
         self.onKeyDown = {K_UP: upDown, K_DOWN: downDown, K_LEFT: leftDown, K_RIGHT: rightDown}
         self.onKeyUp = {K_UP: upUp, K_DOWN: downUp, K_LEFT: leftUp, K_RIGHT: rightUp}
         self.running = True
+        self.excited = False
 
     def show(self):
         '''
@@ -56,9 +57,13 @@ class Display:
         # 路径'C:\\WINDOWS\\Fonts\\STSONG.TTF'已弃用
         font = pygame.font.Font('font/wqy-microhei.ttc', 18)
         bigfont = pygame.font.Font('font/wqy-microhei.ttc', 72)
-        mapImage = pygame.image.load('map.png').convert(32, SRCALPHA)
+        mapImageNormal = pygame.image.load('map.png').convert(32, SRCALPHA)
+        mapImageExcited = pygame.image.load('map_excited.png').convert(32, SRCALPHA)
+        mapImage = mapImageNormal
         mapRect = mapImage.get_rect()
-        carImage = pygame.image.load('car.png').convert(32, SRCALPHA)
+        carImageNormal = pygame.image.load('car.png').convert(32, SRCALPHA)
+        carImageExcited = pygame.image.load('car_excited.png').convert(32, SRCALPHA)
+        carImage = carImageNormal
         corner = carImage.get_at((0, 0))
         for x in range(carImage.get_width()):
             for y in range(carImage.get_height()):
@@ -167,6 +172,15 @@ class Display:
                     if event.key == K_ESCAPE:
                         self.stop()
                 if event.type == KEYDOWN:
+                    if event.key == K_e:
+                        if self.excited:
+                            carImage = carImageNormal
+                            mapImage = mapImageNormal
+                            self.excited = False
+                        else:
+                            carImage = carImageExcited
+                            mapImage = mapImageExcited
+                            self.excited = True
                     if event.key in self.onKeyDown:
                         self.onKeyDown[event.key]()
             data = self.getData()
